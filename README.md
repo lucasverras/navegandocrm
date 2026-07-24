@@ -47,6 +47,16 @@ NEXT_PUBLIC_APP_URL=
      ```
    - Faça login em `/login` com essas credenciais.
 
+### Migrations automáticas via GitHub Actions
+
+O workflow `.github/workflows/supabase-migrations.yml` roda `supabase db push` automaticamente a cada push na `main` que altere algo em `supabase/migrations/`. Para ativar, adicione estes 3 secrets no repositório do GitHub (Settings → Secrets and variables → Actions → New repository secret):
+
+- `SUPABASE_ACCESS_TOKEN` — gere em [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) → "Generate new token".
+- `SUPABASE_PROJECT_REF` — no painel do projeto, é o identificador na URL (`https://supabase.com/dashboard/project/<isso-aqui>`) ou em Project Settings → General → "Reference ID".
+- `SUPABASE_DB_PASSWORD` — a senha do banco Postgres definida na criação do projeto (diferente das API keys). Se você não lembra, redefina em Project Settings → Database → "Reset database password".
+
+Sem esses secrets configurados, o workflow falha (mas não afeta o deploy do app — é um job independente). Você também pode rodar manualmente pela aba "Actions" do GitHub ("Run workflow").
+
 ## Google Places API
 
 1. Crie um projeto no Google Cloud Console.
