@@ -5,6 +5,7 @@ import { searchTriggerSchema } from "@/lib/schemas";
 import { geocodeRegion, searchNearbyByCategory, dedupePlaces } from "@/lib/google-places";
 import { CATEGORIES } from "@/types/domain";
 import { calculatePreScore } from "@/lib/prescore";
+import { matchesKnownFranchise } from "@/lib/discovery-filters";
 import { rateLimit } from "@/lib/rate-limit";
 import type { RegionRow, SearchRow } from "@/types/database";
 
@@ -99,11 +100,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         google_rating: place.rating,
         website: place.website,
         phone: place.phone,
-        category: place.category,
-        is_duplicate: false,
-        commercial_status: "not_contacted",
-        business_status: "new",
+        price_level: place.priceLevel,
         estimated_units: 1,
+        isLikelyIndependent: !matchesKnownFranchise(place.name),
       });
 
       const { error: insertError } = await supabase.from("leads").insert({

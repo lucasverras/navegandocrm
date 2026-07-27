@@ -87,8 +87,73 @@ export interface LeadRow {
   closed_note: string | null;
   lost_reason: string | null;
   archived_at: string | null;
+  discovery_campaign_id: string | null;
+  triage_status: "pending_review" | "approved" | "rejected" | "review_later" | "auto_filtered";
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  rejection_reason: string | null;
+  approval_notes: string | null;
+  exclusion_reason:
+    | "blocked_category"
+    | "blocked_keyword"
+    | "closed"
+    | "duplicate"
+    | "out_of_radius"
+    | "low_reviews"
+    | "already_rejected"
+    | "existing_client"
+    | "already_prospected"
+    | "excluded_franchise"
+    | null;
+  preparation_status: "not_prepared" | "preparing" | "partially_prepared" | "ready" | "outdated" | "failed";
+  prepared_at: string | null;
+  preparation_hash: string | null;
+  next_best_action: string | null;
+  instagram_handle: string | null;
+  instagram_url: string | null;
+  instagram_confirmed: boolean;
+  instagram_confirmation_method: "manual" | "ai_search" | null;
+  instagram_checked_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DiscoveryCampaignRow {
+  id: string;
+  name: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  lat: number | null;
+  lng: number | null;
+  radius_meters: number;
+  included_types: string[];
+  excluded_types: string[];
+  blocked_keywords: string[];
+  min_rating: number | null;
+  min_reviews: number | null;
+  exclude_franchises: boolean;
+  exclude_chains: boolean;
+  exclude_no_phone: boolean;
+  exclude_no_website: boolean;
+  status: "active" | "paused" | "archived";
+  last_searched_at: string | null;
+  source_region_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryCampaignStatsRow {
+  discovery_campaign_id: string;
+  pending_review: number;
+  approved: number;
+  rejected: number;
+  review_later: number;
+  auto_filtered: number;
+  prepared: number;
+  in_pipeline: number;
+  total_found: number;
 }
 
 export interface LeadSourceRow {
@@ -224,6 +289,7 @@ export interface Database {
   public: {
     Tables: {
       regions: TableDef<RegionRow>;
+      discovery_campaigns: TableDef<DiscoveryCampaignRow>;
       searches: TableDef<SearchRow>;
       leads: TableDef<LeadRow>;
       lead_sources: TableDef<LeadSourceRow>;
@@ -237,7 +303,9 @@ export interface Database {
       settings: TableDef<SettingsRow>;
       profiles: TableDef<ProfileRow>;
     };
-    Views: Record<string, never>;
+    Views: {
+      discovery_campaign_stats: { Row: DiscoveryCampaignStatsRow };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
   };

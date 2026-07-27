@@ -34,6 +34,7 @@ export interface PlaceResult {
   placeId: string;
   name: string;
   category: Category;
+  types: string[];
   address: string | null;
   phone: string | null;
   website: string | null;
@@ -55,51 +56,62 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
 
 // Searches one category around a lat/lng using the Places API (New) Nearby Search.
 // Only requests/saves the compact field set we actually use — never raw HTML or full pages.
+// Paginates up to `maxPages` (20 results/page) instead of silently truncating at 20 total.
 export async function searchNearbyByCategory(
   lat: number,
   lng: number,
   radiusMeters: number,
-  category: Category
+  category: Category,
+  maxPages = 3
 ): Promise<PlaceResult[]> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_MAPS_API_KEY is not set");
 
-  const res = await fetch(`${PLACES_BASE}/places:searchNearby`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber," +
-        "places.websiteUri,places.googleMapsUri,places.rating,places.userRatingCount,places.priceLevel," +
-        "places.location,places.businessStatus",
-    },
-    body: JSON.stringify({
-      includedTypes: [category],
-      maxResultCount: 20,
-      locationRestriction: {
-        circle: { center: { latitude: lat, longitude: lng }, radius: radiusMeters },
+  const results: PlaceResult[] = [];
+  let pageToken: string | undefined;
+  let pagesFetched = 0;
+
+  do {
+    const res = await fetch(`${PLACES_BASE}/places:searchNearby`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber," +
+          "places.websiteUri,places.googleMapsUri,places.rating,places.userRatingCount,places.priceLevel," +
+          "places.location,places.businessStatus,places.primaryType,places.types,nextPageToken",
       },
-    }),
-  });
+      body: JSON.stringify(
+        pageToken
+          ? { pageToken }
+          : {
+              includedTypes: [category],
+              maxResultCount: 20,
+              locationRestriction: {
+                circle: { center: { latitude: lat, longitude: lng }, radius: radiusMeters },
+              },
+            }
+      ),
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Places search failed (${res.status}): ${text.slice(0, 300)}`);
-  }
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Places search failed (${res.status}): ${text.slice(0, 300)}`);
+    }
 
-  const data = await res.json();
-  const places = (data.places ?? []) as Record<string, unknown>[];
+    const data = await res.json();
+    const places = (data.places ?? []) as Record<string, unknown>[];
 
-  return places
-    .filter((p) => p.businessStatus !== "CLOSED_PERMANENTLY")
-    .map((p) => {
+    for (const p of places) {
+      if (p.businessStatus === "CLOSED_PERMANENTLY") continue;
       const location = p.location as { latitude?: number; longitude?: number } | undefined;
       const displayName = p.displayName as { text?: string } | undefined;
-      return {
+      results.push({
         placeId: p.id as string,
         name: displayName?.text ?? "Sem nome",
         category,
+        types: (p.types as string[]) ?? (p.primaryType ? [p.primaryType as string] : []),
         address: (p.formattedAddress as string) ?? null,
         phone: (p.nationalPhoneNumber as string) ?? null,
         website: (p.websiteUri as string) ?? null,
@@ -109,8 +121,16 @@ export async function searchNearbyByCategory(
         priceLevel: p.priceLevel ? PRICE_LEVEL_MAP[p.priceLevel as string] ?? null : null,
         lat: location?.latitude ?? null,
         lng: location?.longitude ?? null,
-      };
-    });
+      });
+    }
+
+    pageToken = data.nextPageToken as string | undefined;
+    pagesFetched += 1;
+    // Places API (New) requires a short delay before a pageToken becomes valid.
+    if (pageToken && pagesFetched < maxPages) await new Promise((r) => setTimeout(r, 2000));
+  } while (pageToken && pagesFetched < maxPages);
+
+  return results;
 }
 
 export function dedupePlaces(results: PlaceResult[]): PlaceResult[] {

@@ -13,19 +13,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/login");
 
   const nowIso = new Date().toISOString();
-  const [{ count: overdueCount }, { count: readyCount }] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("id", { count: "exact", head: true })
-      .lt("next_follow_up_at", nowIso)
-      .neq("pipeline_stage", "closed")
-      .is("archived_at", null),
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("commercial_status", "message_ready"),
-  ]);
+  const [{ count: overdueCount }, { count: readyCount }, { count: pendingReviewCount }, { count: readyToPrepareCount }] =
+    await Promise.all([
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .lt("next_follow_up_at", nowIso)
+        .neq("pipeline_stage", "closed")
+        .is("archived_at", null),
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("commercial_status", "message_ready"),
+      supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "pending_review"),
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("triage_status", "approved")
+        .neq("preparation_status", "ready"),
+    ]);
 
   const navItems: NavItem[] = [
     { href: "/dashboard", label: "Visão geral", icon: "LayoutDashboard" },
     { href: "/hoje", label: "Hoje", icon: "CalendarClock", badge: overdueCount ?? 0 },
+    { href: "/descobrir", label: "Descobrir", icon: "Compass" },
+    { href: "/selecionar", label: "Selecionar", icon: "ClipboardCheck", badge: pendingReviewCount ?? 0 },
+    { href: "/preparar", label: "Preparar", icon: "Sparkles", badge: readyToPrepareCount ?? 0 },
     { href: "/pipeline", label: "Pipeline", icon: "KanbanSquare" },
     { href: "/leads", label: "Leads", icon: "Users" },
     { href: "/regioes", label: "Regiões", icon: "MapPin" },

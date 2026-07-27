@@ -3,9 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, MapPin, Users, History, CalendarClock, KanbanSquare } from "lucide-react";
+import { LayoutDashboard, MapPin, Users, History, CalendarClock, KanbanSquare, Compass, ClipboardCheck, Sparkles } from "lucide-react";
 
-const ICONS = { LayoutDashboard, MapPin, Users, History, CalendarClock, KanbanSquare } as const;
+const ICONS = {
+  LayoutDashboard,
+  MapPin,
+  Users,
+  History,
+  CalendarClock,
+  KanbanSquare,
+  Compass,
+  ClipboardCheck,
+  Sparkles,
+} as const;
 
 export interface NavItem {
   href: string;

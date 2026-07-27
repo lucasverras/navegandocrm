@@ -83,10 +83,15 @@
       "Bash(/usr/bin/curl -s --max-time 30 -b sb-vzevzkapcsosjjdgzavv-auth-token=__CMDSUB_OUTPUT__ http://127.0.0.1:3000/leads/__TRACKED_VAR__ -o /tmp/lead_detail.html -w 'status: %{http_code}\\\\n')",
       "Bash(git branch *)",
       "Bash(gh auth *)",
-      "WebFetch(domain:www.navegandomkt.com.br)"
+      "WebFetch(domain:www.navegandomkt.com.br)",
+      "Bash(rm \".claude/settings 2.json\"; git status)",
+      "Bash(node -e ' *)",
+      "Bash(tee /tmp/tsc2.out)",
+      "Bash(NEXT_TELEMETRY_DISABLED=1 npm run build)"
     ],
     "additionalDirectories": [
-      "/Users/lucaslucas/Desktop/opa/src/app/api/messages"
+      "/Users/lucaslucas/Desktop/opa/src/app/api/messages",
+      "/Users/lucaslucas/Desktop/opa/.claude"
     ]
   }
 }

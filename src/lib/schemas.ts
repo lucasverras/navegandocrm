@@ -43,6 +43,40 @@ export const searchTriggerSchema = z.object({
   categories: z.array(z.enum(CATEGORIES)).min(1).optional(),
 });
 
+export const discoveryCampaignCreateSchema = z.object({
+  name: z.string().min(2).max(160),
+  neighborhood: z.string().min(2).max(120),
+  city: z.string().min(2).max(120),
+  state: z.string().min(2).max(60),
+  radius_meters: z.coerce.number().int().min(200).max(20000).default(2000),
+  included_types: z.array(z.enum(CATEGORIES)).min(1),
+  excluded_types: z.array(z.string()).max(50).default([]),
+  blocked_keywords: z.array(z.string().max(60)).max(50).default([]),
+  min_rating: z.coerce.number().min(0).max(5).nullable().optional(),
+  min_reviews: z.coerce.number().int().min(0).nullable().optional(),
+  exclude_franchises: z.boolean().default(false),
+  exclude_chains: z.boolean().default(false),
+  exclude_no_phone: z.boolean().default(false),
+  exclude_no_website: z.boolean().default(false),
+  force: z.boolean().default(false),
+});
+
+export const discoveryCampaignUpdateSchema = discoveryCampaignCreateSchema.partial().extend({
+  status: z.enum(["active", "paused", "archived"]).optional(),
+});
+
+export const triageDecisionSchema = z.object({
+  decision: z.enum(["approved", "rejected", "review_later"]),
+  rejection_reason: z.string().max(300).optional(),
+  approval_notes: z.string().max(1000).optional(),
+});
+
+export const bulkTriageActionSchema = z.object({
+  leadIds: z.array(z.string().uuid()).min(1).max(500),
+  decision: z.enum(["approved", "rejected", "review_later"]),
+  rejection_reason: z.string().max(300).optional(),
+});
+
 export const analyzeLeadsSchema = z.object({
   leadIds: z.array(z.string().uuid()).min(1).max(200),
   force: z.boolean().optional(),
