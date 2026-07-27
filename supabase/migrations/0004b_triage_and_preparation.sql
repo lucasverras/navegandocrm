@@ -33,3 +33,21 @@ create index if not exists leads_preparation_status_idx on public.leads (prepara
 -- pipeline_stage/business_status/etc, and simply get the new default triage_status='pending_review'
 -- + preparation_status='not_prepared' bolted on. This does NOT move them out of the Kanban —
 -- that reclassification is a separate, explicitly-confirmed step (see 0006_migrate_pending_leads.sql).
+
+-- Rollup counters computed on read (avoids write-amplification/drift vs stored counters).
+-- Lives here (not in 0004_discovery_campaigns.sql) because it depends on triage_status/
+-- preparation_status/pipeline_stage, which must already exist.
+create or replace view public.discovery_campaign_stats as
+select
+  dc.id as discovery_campaign_id,
+  count(l.id) filter (where l.triage_status = 'pending_review') as pending_review,
+  count(l.id) filter (where l.triage_status = 'approved') as approved,
+  count(l.id) filter (where l.triage_status = 'rejected') as rejected,
+  count(l.id) filter (where l.triage_status = 'review_later') as review_later,
+  count(l.id) filter (where l.triage_status = 'auto_filtered') as auto_filtered,
+  count(l.id) filter (where l.preparation_status = 'ready') as prepared,
+  count(l.id) filter (where l.pipeline_stage is not null) as in_pipeline,
+  count(l.id) as total_found
+from public.discovery_campaigns dc
+left join public.leads l on l.discovery_campaign_id = dc.id
+group by dc.id;

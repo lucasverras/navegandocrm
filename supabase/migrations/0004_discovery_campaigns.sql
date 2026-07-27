@@ -42,21 +42,9 @@ create trigger set_discovery_campaigns_updated_at
   before update on public.discovery_campaigns
   for each row execute function public.set_updated_at();
 
--- Rollup counters computed on read (avoids write-amplification/drift vs stored counters).
-create or replace view public.discovery_campaign_stats as
-select
-  dc.id as discovery_campaign_id,
-  count(l.id) filter (where l.triage_status = 'pending_review') as pending_review,
-  count(l.id) filter (where l.triage_status = 'approved') as approved,
-  count(l.id) filter (where l.triage_status = 'rejected') as rejected,
-  count(l.id) filter (where l.triage_status = 'review_later') as review_later,
-  count(l.id) filter (where l.triage_status = 'auto_filtered') as auto_filtered,
-  count(l.id) filter (where l.preparation_status = 'ready') as prepared,
-  count(l.id) filter (where l.pipeline_stage is not null) as in_pipeline,
-  count(l.id) as total_found
-from public.discovery_campaigns dc
-left join public.leads l on l.discovery_campaign_id = dc.id
-group by dc.id;
+-- Note: discovery_campaign_stats view lives in 0004b_triage_and_preparation.sql —
+-- it depends on leads.triage_status/preparation_status, which don't exist until that
+-- migration runs. Defining it here (before those columns exist) breaks the migration.
 
 alter table public.discovery_campaigns enable row level security;
 drop policy if exists "discovery_campaigns_all_authenticated" on public.discovery_campaigns;
