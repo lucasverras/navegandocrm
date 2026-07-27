@@ -87,7 +87,17 @@
       "Bash(rm \".claude/settings 2.json\"; git status)",
       "Bash(node -e ' *)",
       "Bash(tee /tmp/tsc2.out)",
-      "Bash(NEXT_TELEMETRY_DISABLED=1 npm run build)"
+      "Bash(NEXT_TELEMETRY_DISABLED=1 npm run build)",
+      "Bash(gh run *)",
+      "Bash(curl -s \"https://api.github.com/repos/lucasverras/navegandocrm/actions/runs?per_page=3\")",
+      "Bash(curl -s \"https://api.github.com/repos/lucasverras/navegandocrm/actions/runs/30313627336/jobs\")",
+      "Bash(curl -sL \"https://api.github.com/repos/lucasverras/navegandocrm/actions/jobs/90134407162/logs\")",
+      "Bash(curl -s \"https://api.github.com/repos/lucasverras/navegandocrm/check-runs/90134407162\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('output',{}\\), indent=2\\)\\)\")",
+      "Bash(curl -s \"https://api.github.com/repos/lucasverras/navegandocrm/check-runs/90134407162/annotations\")",
+      "Bash(curl -s \"https://api.github.com/repos/lucasverras/navegandocrm/actions/runs?per_page=2&branch=main\")",
+      "Bash(python3 -c ' *)",
+      "Bash(git mv *)"
     ],
     "additionalDirectories": [
       "/Users/lucaslucas/Desktop/opa/src/app/api/messages",
