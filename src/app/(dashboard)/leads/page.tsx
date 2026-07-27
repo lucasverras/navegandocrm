@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { LeadsExplorer } from "@/components/leads/LeadsExplorer";
 import type { LeadRow, RegionRow } from "@/types/database";
 
@@ -100,12 +101,7 @@ export default async function LeadsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="mt-1 text-sm text-muted">
-          Selecione leads e clique em &quot;Analisar com IA&quot; para gerar a análise.
-        </p>
-      </div>
+      <PageHeading eyebrow="Prospecção" title="Leads" subtitle="Selecione e clique em “Analisar com IA” para transformar dados em oportunidade." />
       <LeadsExplorer leads={typedLeads ?? []} regions={regions ?? []} />
     </div>
   );

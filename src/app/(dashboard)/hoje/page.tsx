@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { HojeFilterBar } from "@/components/hoje/HojeFilterBar";
 import { HojeSection } from "@/components/hoje/HojeSection";
 import { HojeLeadRow } from "@/components/hoje/HojeLeadRow";
@@ -173,10 +174,7 @@ export default async function HojePage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Hoje</h1>
-        <p className="mt-1 text-sm text-muted">Sua central diária: follow-ups, leads parados e ações recomendadas.</p>
-      </div>
+      <PageHeading eyebrow="Rotina diária" title="Hoje" subtitle="Follow-ups, leads parados e a próxima ação certa — na ordem em que importa." />
 
       <HojeFilterBar regions={regions} />
 

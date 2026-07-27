@@ -3,6 +3,7 @@ import { RegionForm } from "@/components/regions/RegionForm";
 import { RegionRow } from "@/components/regions/RegionRow";
 import { Table, THead, TBody, Tr, Th } from "@/components/ui/Table";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { MapPin } from "lucide-react";
 import type { RegionRow as RegionRowType } from "@/types/database";
 
@@ -13,10 +14,7 @@ export default async function RegioesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Regiões</h1>
-        <p className="mt-1 text-sm text-muted">Cadastre bairros para pesquisar restaurantes com o Google Places.</p>
-      </div>
+      <PageHeading eyebrow="Território" title="Regiões" subtitle="Cadastre bairros para pesquisar restaurantes com o Google Places." />
 
       <RegionForm />
 

@@ -73,11 +73,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="flex flex-col gap-6">
       {/* Resumo */}
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface/80 p-5">
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-surface/80 p-5">
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent to-accent-2" />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{lead.name}</h1>
+              <h1 className="font-display text-2xl font-extrabold tracking-tight">{lead.name}</h1>
               {lead.is_demo && <Badge tone="warning">DEMO</Badge>}
               {followUpOverdue && <Badge tone="danger">Follow-up atrasado</Badge>}
             </div>

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
 import type { LeadRow, RegionRow } from "@/types/database";
 
@@ -31,12 +32,11 @@ export default async function PipelinePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Pipeline</h1>
-        <p className="mt-1 text-sm text-muted">
-          Arraste os leads entre as etapas ou use o menu &quot;Mover para&quot; em cada card.
-        </p>
-      </div>
+      <PageHeading
+        eyebrow="Funil comercial"
+        title="Pipeline"
+        subtitle="Arraste os leads entre as etapas ou use o menu “Mover para” em cada card."
+      />
       <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} />
     </div>
   );

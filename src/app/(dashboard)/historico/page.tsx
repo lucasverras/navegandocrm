@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Table, THead, TBody, Tr, Th, Td } from "@/components/ui/Table";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { formatDate } from "@/lib/utils";
 import { History } from "lucide-react";
 
@@ -14,10 +15,7 @@ export default async function HistoricoPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Histórico</h1>
-        <p className="mt-1 text-sm text-muted">Log de pesquisas, análises, mensagens e mudanças de status.</p>
-      </div>
+      <PageHeading eyebrow="Registro" title="Histórico" subtitle="Log de pesquisas, análises, mensagens e mudanças de status." />
 
       {!events?.length ? (
         <EmptyState icon={<History className="h-8 w-8" />} title="Nenhum evento registrado" />

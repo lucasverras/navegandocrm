@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
 import { formatDate } from "@/lib/utils";
 
@@ -54,16 +55,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted">Visão geral do funil de prospecção.</p>
-      </div>
+      <PageHeading eyebrow="Visão geral" title="Funil de prospecção" subtitle="O movimento real por trás dos números: leads, oportunidades e conversas em andamento." />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((stat) => (
-          <Card key={stat.label}>
+          <Card key={stat.label} className="relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent to-accent-2" />
             <CardContent className="pt-5">
-              <p className="text-2xl font-semibold tracking-tight text-accent-2">{stat.value}</p>
+              <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">{stat.value}</p>
               <p className="mt-1 text-xs text-muted">{stat.label}</p>
             </CardContent>
           </Card>

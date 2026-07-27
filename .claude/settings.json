@@ -80,7 +80,10 @@
       "Bash(/usr/bin/curl -s --max-time 15 -X PATCH http://127.0.0.1:3000/api/leads/__TRACKED_VAR__/pipeline -b sb-vzevzkapcsosjjdgzavv-auth-token=__CMDSUB_OUTPUT__ -H 'Content-Type: application/json' -d '{\"stage\":\"qualified\",\"position\":0}')",
       "Bash(/usr/bin/curl -s --max-time 15 -X PATCH http://127.0.0.1:3000/api/leads/__TRACKED_VAR__/follow-up -b sb-vzevzkapcsosjjdgzavv-auth-token=__CMDSUB_OUTPUT__ -H 'Content-Type: application/json' -d '{\"next_follow_up_at\":\"2026-07-25T12:00:00.000Z\"}')",
       "Bash(/usr/bin/curl -s --max-time 15 -X POST http://127.0.0.1:3000/api/leads/__TRACKED_VAR__/close -b sb-vzevzkapcsosjjdgzavv-auth-token=__CMDSUB_OUTPUT__ -H 'Content-Type: application/json' -d '{\"closed_service\":\"Gestão de redes sociais\",\"closed_value\":2500}')",
-      "Bash(/usr/bin/curl -s --max-time 30 -b sb-vzevzkapcsosjjdgzavv-auth-token=__CMDSUB_OUTPUT__ http://127.0.0.1:3000/leads/__TRACKED_VAR__ -o /tmp/lead_detail.html -w 'status: %{http_code}\\\\n')"
+      "Bash(/usr/bin/curl -s --max-time 30 -b sb-vzevzkapcsosjjdgzavv-auth-token=__CMDSUB_OUTPUT__ http://127.0.0.1:3000/leads/__TRACKED_VAR__ -o /tmp/lead_detail.html -w 'status: %{http_code}\\\\n')",
+      "Bash(git branch *)",
+      "Bash(gh auth *)",
+      "WebFetch(domain:www.navegandomkt.com.br)"
     ],
     "additionalDirectories": [
       "/Users/lucaslucas/Desktop/opa/src/app/api/messages"
