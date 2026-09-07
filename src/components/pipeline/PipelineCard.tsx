@@ -124,7 +124,7 @@ export function PipelineCard({
         <LeadQuickActions lead={lead} stopNavigation />
       </div>
 
-      {lead.pipeline_stage === "meeting_proposal" && (
+      {lead.pipeline_stage === "meeting" && (
         <select
           data-no-navigate
           onPointerDown={stopDrag}

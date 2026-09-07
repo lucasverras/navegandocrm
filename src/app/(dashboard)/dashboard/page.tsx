@@ -75,7 +75,7 @@ export default async function DashboardPage() {
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
-      .or("commercial_status.eq.meeting_scheduled,pipeline_stage.eq.meeting_proposal")
+      .or("commercial_status.eq.meeting_scheduled,pipeline_stage.eq.meeting")
       .is("archived_at", null),
     // Total de restaurantes (linha secundária)
     supabase.from("leads").select("id", { count: "exact", head: true }),

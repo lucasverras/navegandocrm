@@ -11,6 +11,7 @@ import { LeadCard } from "@/components/leads/LeadCard";
 import { LeadsFilters } from "@/components/leads/LeadsFilters";
 import { BulkActionsBar } from "@/components/leads/BulkActionsBar";
 import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
+import { LeadPreviewTrigger } from "@/components/leads/LeadDrawer";
 import { daysFromNow } from "@/lib/utils";
 import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type { LeadWithRegion } from "@/app/(dashboard)/leads/page";
@@ -219,6 +220,7 @@ export function LeadsExplorer({
                   </Td>
                   <Td>
                     <div className="flex items-center gap-1">
+                      <LeadPreviewTrigger leadId={lead.id} />
                       <LeadQuickActions lead={lead} />
                       <button
                         type="button"

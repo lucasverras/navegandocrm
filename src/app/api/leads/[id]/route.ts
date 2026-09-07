@@ -9,6 +9,30 @@ const patchSchema = z.object({
   opted_out: z.boolean().optional(),
 });
 
+// Compact summary for the side-drawer preview — avoids loading the full lead page.
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const { id } = await params;
+  const admin = createAdminClient();
+
+  const [{ data: lead }, { data: dm }, { data: msg }, { data: analysis }] = await Promise.all([
+    admin
+      .from("leads")
+      .select(
+        "id, name, category, phone, website, instagram, instagram_handle, instagram_url, maps_url, google_rating, google_review_count, ai_score, pre_score, pipeline_stage, commercial_status, next_follow_up_at, regions(neighborhood, city)"
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    admin.from("decision_makers").select("name, role, confidence").eq("lead_id", id).eq("found", true).order("researched_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("outreach_messages").select("content, variant").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("lead_analysis").select("main_opportunity, opportunity_focus").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  if (!lead) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
+  return NextResponse.json({ lead, decisionMaker: dm ?? null, latestMessage: msg ?? null, analysis: analysis ?? null });
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });

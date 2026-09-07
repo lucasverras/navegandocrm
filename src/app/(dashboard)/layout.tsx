@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LogoutButton } from "@/components/LogoutButton";
 import { NavLinks, type NavItem } from "@/components/NavLinks";
+import { CommandPalette, SearchTrigger } from "@/components/CommandPalette";
+import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { Compass } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +36,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-screen w-full flex-col md:flex-row">
+      <CommandPalette />
+      <LeadDrawer />
       <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface/60 px-4 py-6 md:flex">
         <div className="mb-8 flex items-center gap-2 px-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent-2">
@@ -41,6 +45,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
           <span className="font-display text-sm font-extrabold uppercase tracking-wide">Radar Navegando</span>
         </div>
+        <SearchTrigger className="mb-3 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted transition-colors hover:text-foreground" />
         <NavLinks items={navItems} />
         {!!readyCount && (
           <p className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-muted">

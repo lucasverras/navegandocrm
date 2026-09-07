@@ -126,17 +126,31 @@ export type MessageVariant = (typeof MESSAGE_VARIANTS)[number];
 
 // Commercial pipeline (Kanban stages) — separate concern from business_status/commercial_status,
 // which track outreach/relationship status, not deal position.
-export const PIPELINE_STAGES = ["new", "qualified", "to_approach", "in_contact", "meeting_proposal", "closed"] as const;
+export const PIPELINE_STAGES = [
+  "ready_to_approach",
+  "first_contact",
+  "reaching_dm",
+  "talking_dm",
+  "meeting",
+  "proposal",
+  "negotiation",
+  "closed",
+] as const;
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
 export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
-  new: "Novos",
-  qualified: "Qualificados",
-  to_approach: "A abordar",
-  in_contact: "Em contato",
-  meeting_proposal: "Reunião / Proposta",
-  closed: "Fechados",
+  ready_to_approach: "Pronto para abordar",
+  first_contact: "Primeiro contato",
+  reaching_dm: "Tentando decisor",
+  talking_dm: "Falando com decisor",
+  meeting: "Reunião",
+  proposal: "Proposta",
+  negotiation: "Negociação",
+  closed: "Fechado",
 };
+
+// The first stage a lead lands on when consciously added to the pipeline.
+export const FIRST_PIPELINE_STAGE: PipelineStage = "ready_to_approach";
 
 export const MEETING_STATUSES = ["scheduled", "held", "proposal_pending", "proposal_sent", "negotiation"] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];

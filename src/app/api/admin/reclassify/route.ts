@@ -42,10 +42,8 @@ async function run(dryRun: boolean) {
 
   const before = funnel(leads);
 
-  // Bucket the work.
+  // Bucket the junk by reason.
   const junkByReason = new Map<string, string[]>();
-  const rawNewToDetach: string[] = []; // non-junk rows sitting in 'new' (never consciously added)
-
   for (const lead of leads) {
     // Never auto-filter an actual client.
     const reason = lead.business_status === "client" ? null : reclassifyByNameCategory(lead.name, lead.category);
@@ -53,8 +51,6 @@ async function run(dryRun: boolean) {
       const arr = junkByReason.get(reason) ?? [];
       arr.push(lead.id);
       junkByReason.set(reason, arr);
-    } else if (!reason && lead.pipeline_stage === "new") {
-      rawNewToDetach.push(lead.id);
     }
   }
 
@@ -64,7 +60,7 @@ async function run(dryRun: boolean) {
     before,
     would_auto_filter: junkTotal,
     auto_filter_by_reason: Object.fromEntries([...junkByReason].map(([r, ids]) => [r, ids.length])),
-    would_detach_from_pipeline: rawNewToDetach.length + junkTotal,
+    would_detach_from_pipeline: junkTotal,
   };
 
   if (dryRun) return summary;
@@ -78,11 +74,6 @@ async function run(dryRun: boolean) {
         .update({ triage_status: "auto_filtered", exclusion_reason: reason, pre_score: 0, pipeline_stage: null })
         .in("id", chunk);
     }
-  }
-  // Non-junk raw rows dumped in 'new' — pull off the board (they return to discovery/triage).
-  for (let i = 0; i < rawNewToDetach.length; i += 200) {
-    const chunk = rawNewToDetach.slice(i, i + 200);
-    await admin.from("leads").update({ pipeline_stage: null }).in("id", chunk);
   }
 
   // Recompute the funnel after.

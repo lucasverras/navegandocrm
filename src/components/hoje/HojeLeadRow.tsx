@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
+import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
 import { formatHumanDate, formatDate, daysFromNow } from "@/lib/utils";
-import { PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type { HojeLead } from "./types";
 import { leadScore } from "./types";
 
@@ -38,11 +39,11 @@ export function HojeLeadRow({
             {lead.name}
           </Link>
           <Badge tone={scoreTone(score)}>{score}</Badge>
-          <Badge tone="default">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
+          {lead.pipeline_stage && <Badge tone="default">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>}
           {isOverdue && <Badge tone="danger">{Math.abs(overdueDays!)} dia(s) atrasado</Badge>}
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
-          <span>{lead.category}</span>
+          <span>{categoryLabel(lead.category)}</span>
           {lead.region && (
             <span>
               {lead.region.neighborhood}, {lead.region.city}
@@ -60,6 +61,7 @@ export function HojeLeadRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <LeadQuickActions lead={lead} />
         {whatsappMessage && lead.phone && <WhatsAppButton phone={lead.phone} message={whatsappMessage} />}
         <Link href={`/leads/${lead.id}`}>
           <Button variant="outline" size="sm">

@@ -17,7 +17,7 @@ export function AddToPipelineButton({ leadId }: { leadId: string }) {
     const res = await fetch(`/api/leads/${leadId}/pipeline`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage: "new", position: 0 }),
+      body: JSON.stringify({ stage: "ready_to_approach", position: 0 }),
     });
     setLoading(false);
     if (!res.ok) {

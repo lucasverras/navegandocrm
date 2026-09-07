@@ -23,11 +23,34 @@ const defaultForm = {
   exclude_no_website: false,
 };
 
+// One-click presets so a campaign can be set up in seconds (brief §DESCOBERTA).
+const PRESETS: { label: string; patch: Partial<typeof defaultForm> }[] = [
+  {
+    label: "Independentes",
+    patch: { included_types: [...CATEGORIES], exclude_franchises: true, min_reviews: "20" },
+  },
+  {
+    label: "Hamburguerias",
+    patch: { included_types: ["hamburger_restaurant", "sandwich_shop"], exclude_franchises: true },
+  },
+  { label: "Bares", patch: { included_types: ["bar"], exclude_franchises: true } },
+  { label: "Cafeterias", patch: { included_types: ["cafe", "coffee_shop", "bakery"] } },
+  { label: "Pizzarias", patch: { included_types: ["pizza_restaurant", "italian_restaurant"], exclude_franchises: true } },
+  { label: "Premium", patch: { included_types: [...CATEGORIES], min_rating: "4.5", min_reviews: "100" } },
+  { label: "Todos gastronômicos", patch: { included_types: [...CATEGORIES] } },
+];
+
 export function CampaignForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(defaultForm);
   const [conflict, setConflict] = useState<{ existingCampaignId: string } | null>(null);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
+  function applyPreset(p: (typeof PRESETS)[number]) {
+    setForm((f) => ({ ...f, ...p.patch }));
+    setActivePreset(p.label);
+  }
 
   function toggleCategory(cat: string) {
     setForm((f) => ({
@@ -85,6 +108,23 @@ export function CampaignForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted">Preset:</span>
+            {PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => applyPreset(p)}
+                className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                  activePreset === p.label
+                    ? "border-accent bg-accent-soft text-accent-2"
+                    : "border-border text-muted hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div className="sm:col-span-2">
               <Label htmlFor="name">Nome da campanha</Label>

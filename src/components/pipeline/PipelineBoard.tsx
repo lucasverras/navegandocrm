@@ -30,7 +30,7 @@ function groupByStage(leads: LeadRow[]): Record<PipelineStage, LeadRow[]> {
     LeadRow[]
   >;
   for (const lead of leads) {
-    const stage = (groups[lead.pipeline_stage] ? lead.pipeline_stage : "new") as PipelineStage;
+    const stage = (lead.pipeline_stage && groups[lead.pipeline_stage] ? lead.pipeline_stage : "ready_to_approach") as PipelineStage;
     groups[stage].push(lead);
   }
   for (const stage of PIPELINE_STAGES) {
@@ -50,7 +50,7 @@ export function PipelineBoard({
 }) {
   const [leads, setLeads] = useState<LeadRow[]>(initialLeads);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [mobileStage, setMobileStage] = useState<PipelineStage>("new");
+  const [mobileStage, setMobileStage] = useState<PipelineStage>("ready_to_approach");
   const [showArchived, setShowArchived] = useState(false);
   const [pendingClose, setPendingClose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
 

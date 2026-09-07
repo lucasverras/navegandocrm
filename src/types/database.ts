@@ -69,7 +69,16 @@ export interface LeadRow {
   is_demo: boolean;
   notes: string | null;
   opted_out: boolean;
-  pipeline_stage: "new" | "qualified" | "to_approach" | "in_contact" | "meeting_proposal" | "closed";
+  pipeline_stage:
+    | "ready_to_approach"
+    | "first_contact"
+    | "reaching_dm"
+    | "talking_dm"
+    | "meeting"
+    | "proposal"
+    | "negotiation"
+    | "closed"
+    | null;
   pipeline_position: number;
   previous_stage: string | null;
   stage_changed_at: string;

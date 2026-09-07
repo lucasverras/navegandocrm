@@ -112,7 +112,7 @@ export default async function HojePage({
             supabase
               .from("leads")
               .select(LEAD_SELECT)
-              .eq("pipeline_stage", "new")
+              .eq("pipeline_stage", "ready_to_approach")
               .is("archived_at", null)
               .gte("pre_score", 70)
               .order("pre_score", { ascending: false })
