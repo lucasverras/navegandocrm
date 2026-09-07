@@ -11,8 +11,10 @@ import { StageMover } from "@/components/leads/StageMover";
 import { FollowUpPicker } from "@/components/leads/FollowUpPicker";
 import { RegisterContactButton } from "@/components/leads/RegisterContactButton";
 import { Timeline } from "@/components/leads/Timeline";
+import { instagramUrl } from "@/components/leads/LeadQuickActions";
+import { FindInstagramButton } from "@/components/leads/FindInstagramButton";
 import { formatDate, formatHumanDate, daysFromNow } from "@/lib/utils";
-import { PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type {
   LeadAnalysisRow,
   DecisionMakerRow,
@@ -26,43 +28,22 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: leadData } = await supabase.from("leads").select("*, regions(id, neighborhood, city)").eq("id", id).single();
+  // All five queries key only off `id` — fetch them in parallel instead of a serial
+  // waterfall of 5 round-trips. `notFound()` still gates on the lead after they resolve.
+  const [{ data: leadData }, { data: analysisRaw }, { data: decisionMakerRaw }, { data: latestMessageRaw }, { data: eventsRaw }] =
+    await Promise.all([
+      supabase.from("leads").select("*, regions(id, neighborhood, city)").eq("id", id).single(),
+      supabase.from("lead_analysis").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("decision_makers").select("*").eq("lead_id", id).order("researched_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("outreach_messages").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("outreach_events").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(50),
+    ]);
+
   if (!leadData) notFound();
   const lead = leadData as unknown as LeadRow & { regions: Pick<RegionRow, "id" | "neighborhood" | "city"> | null };
-
-  const { data: analysisRaw } = await supabase
-    .from("lead_analysis")
-    .select("*")
-    .eq("lead_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const analysis = analysisRaw as unknown as LeadAnalysisRow | null;
-
-  const { data: decisionMakerRaw } = await supabase
-    .from("decision_makers")
-    .select("*")
-    .eq("lead_id", id)
-    .order("researched_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const decisionMaker = decisionMakerRaw as unknown as DecisionMakerRow | null;
-
-  const { data: latestMessageRaw } = await supabase
-    .from("outreach_messages")
-    .select("*")
-    .eq("lead_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const latestMessage = latestMessageRaw as unknown as OutreachMessageRow | null;
-
-  const { data: eventsRaw } = await supabase
-    .from("outreach_events")
-    .select("*")
-    .eq("lead_id", id)
-    .order("created_at", { ascending: false })
-    .limit(50);
   const events = (eventsRaw ?? []) as unknown as OutreachEventRow[];
 
   const evidence = (analysis?.evidence as unknown as { claim: string; source: string; confidence: number }[]) ?? [];
@@ -83,7 +64,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {followUpOverdue && <Badge tone="danger">Follow-up atrasado</Badge>}
             </div>
             <p className="mt-1 text-sm text-muted">
-              {lead.category} · {lead.regions?.neighborhood ?? "região não informada"}
+              {categoryLabel(lead.category)} · {lead.regions?.neighborhood ?? "região não informada"}
               {lead.regions?.city ? `, ${lead.regions.city}` : ""}
             </p>
           </div>
@@ -131,7 +112,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
               <Info label="Telefone" value={lead.phone} />
               <Info label="Site" value={lead.website} link={lead.website} />
-              <Info label="Instagram" value={lead.instagram} link={lead.instagram ? `https://instagram.com/${lead.instagram.replace("@", "")}` : null} />
+              {instagramUrl(lead) ? (
+                <Info label="Instagram" value={lead.instagram_handle ?? lead.instagram} link={instagramUrl(lead)} />
+              ) : (
+                <div>
+                  <dt className="text-xs text-muted">Instagram</dt>
+                  <dd>{lead.website ? <FindInstagramButton leadId={lead.id} /> : "—"}</dd>
+                </div>
+              )}
               <Info label="Google Maps" value={lead.maps_url ? "Ver no mapa" : null} link={lead.maps_url} />
               <Info label="Nota" value={lead.google_rating?.toString()} />
               <Info label="Avaliações" value={lead.google_review_count?.toString()} />

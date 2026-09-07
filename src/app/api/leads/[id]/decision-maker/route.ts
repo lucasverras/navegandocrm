@@ -26,6 +26,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: leadRaw } = await admin.from("leads").select("*").eq("id", leadId).single();
   if (!leadRaw) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   const lead = leadRaw as unknown as LeadRow;
+  if (lead.triage_status === "rejected" || lead.triage_status === "auto_filtered") {
+    return NextResponse.json({ error: "Lead não aprovado na triagem" }, { status: 409 });
+  }
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "OPENAI_API_KEY não configurada no ambiente." }, { status: 503 });

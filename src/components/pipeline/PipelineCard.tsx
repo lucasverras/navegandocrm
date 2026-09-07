@@ -5,9 +5,16 @@ import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
 import { cn, formatHumanDate, daysFromNow } from "@/lib/utils";
 import type { LeadRow } from "@/types/database";
-import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, MEETING_STATUSES, MEETING_STATUS_LABELS } from "@/types/domain";
+import {
+  PIPELINE_STAGES,
+  PIPELINE_STAGE_LABELS,
+  MEETING_STATUSES,
+  MEETING_STATUS_LABELS,
+  categoryLabel,
+} from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
 const COMMERCIAL_STATUS_LABEL: Record<string, string> = {
@@ -57,45 +64,40 @@ export function PipelineCard({
   const overdue = followUpDays !== null && followUpDays < 0;
 
   function handleCardClick(e: React.MouseEvent) {
-    // Ignore clicks that originated from the drag handle or the meeting-status select.
+    // The whole card is the drag source; a plain click (no 5px movement, enforced by the
+    // board's PointerSensor activationConstraint) opens the lead. Interactive children mark
+    // themselves [data-no-navigate] so they never navigate or start a drag.
     const target = e.target as HTMLElement;
-    if (target.closest("[data-drag-handle]") || target.closest("[data-no-navigate]")) return;
+    if (target.closest("[data-no-navigate]")) return;
     router.push(`/leads/${lead.id}`);
   }
+
+  // Inner controls call this on pointer down so grabbing them never initiates a card drag.
+  const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
 
   return (
     <div
       ref={setNodeRef}
       style={style}
+      onClick={handleCardClick}
       className={cn(
-        "flex flex-col gap-2 rounded-lg border border-border bg-surface-2 p-3 text-sm shadow-sm transition-opacity",
+        "group flex cursor-grab select-none flex-col gap-2 rounded-lg border border-border bg-surface-2 p-3 text-sm shadow-sm transition-opacity active:cursor-grabbing",
         isDragging && "opacity-40"
       )}
+      {...attributes}
+      {...listeners}
     >
       <div className="flex items-start justify-between gap-2">
-        <button
-          type="button"
-          onClick={handleCardClick}
-          className="flex-1 text-left"
-        >
-          <div className="font-medium text-foreground leading-tight">{lead.name}</div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium text-foreground leading-tight">{lead.name}</div>
           <div className="mt-0.5 text-xs text-muted">{regionName ?? "—"}</div>
-        </button>
-        <button
-          type="button"
-          data-drag-handle
-          aria-label={`Mover lead: ${lead.name}`}
-          className="mt-0.5 shrink-0 cursor-grab touch-none rounded p-1 text-muted hover:bg-surface-hover hover:text-foreground active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+        </div>
+        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted/40 group-hover:text-muted" aria-hidden />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge tone="muted" className="text-[10px]">
-          {lead.category}
+          {categoryLabel(lead.category)}
         </Badge>
         <Badge tone={scoreColor(score)} className="text-[10px]">
           {score}
@@ -118,9 +120,14 @@ export function PipelineCard({
         <span>Responsável: {lead.assigned_to ?? "—"}</span>
       </div>
 
+      <div onPointerDown={stopDrag}>
+        <LeadQuickActions lead={lead} stopNavigation />
+      </div>
+
       {lead.pipeline_stage === "meeting_proposal" && (
         <select
           data-no-navigate
+          onPointerDown={stopDrag}
           value={lead.meeting_status ?? ""}
           onChange={(e) => onMeetingStatusChange(e.target.value as MeetingStatus)}
           className="mt-1 rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-foreground"
@@ -139,6 +146,7 @@ export function PipelineCard({
       {/* Non-drag fallback for mobile / accessibility */}
       <select
         data-no-navigate
+        onPointerDown={stopDrag}
         value=""
         onChange={(e) => {
           if (e.target.value) onMoveTo(e.target.value as PipelineStage);

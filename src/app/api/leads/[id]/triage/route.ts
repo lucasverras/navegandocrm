@@ -17,15 +17,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const admin = createAdminClient();
   const now = new Date().toISOString();
+  const isUndo = parsed.data.decision === "pending_review";
 
   const { data, error } = await admin
     .from("leads")
     .update({
       triage_status: parsed.data.decision,
-      reviewed_at: now,
-      reviewed_by: user.id,
-      rejection_reason: parsed.data.rejection_reason ?? null,
-      approval_notes: parsed.data.approval_notes ?? null,
+      // Undo puts the lead back in the queue as if never reviewed.
+      reviewed_at: isUndo ? null : now,
+      reviewed_by: isUndo ? null : user.id,
+      rejection_reason: isUndo ? null : parsed.data.rejection_reason ?? null,
+      approval_notes: isUndo ? null : parsed.data.approval_notes ?? null,
       last_activity_at: now,
     })
     .eq("id", id)

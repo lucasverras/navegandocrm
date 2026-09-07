@@ -1,38 +1,62 @@
-"use client";
-
+// Formerly a recharts bar chart ("Distribuição por categoria"). Recharts was the bulk of the
+// dashboard's First Load JS, so this file now hosts a lightweight, chart-free recent-activity
+// list — no recharts, no client bundle.
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts";
+import { formatHumanDate, formatDate } from "@/lib/utils";
 
-const COLORS = ["#c8601f", "#e4802f", "#a89e8f", "#4a9d6f", "#c99a2e"];
+export type ActivityEvent = { id: string; event_type: string; created_at: string };
 
-export function DashboardCharts({ categoryData }: { categoryData: { name: string; value: number }[] }) {
+// Friendly PT labels for outreach_events.event_type. Mirrors the lead Timeline map, plus
+// graceful fallbacks for the dynamic `status_*` / `meeting_*` event types.
+const EVENT_LABELS: Record<string, string> = {
+  lead_discovered: "Lead descoberto",
+  haiku_analysis: "Análise realizada",
+  batch_analysis_queued: "Análise em lote enfileirada",
+  message_generated: "Mensagem gerada",
+  message_sent: "Mensagem enviada",
+  stage_changed: "Mudança de etapa",
+  follow_up_set: "Follow-up definido",
+  assigned: "Responsável atribuído",
+  contact_registered: "Contato registrado",
+  triage_decision: "Decisão de triagem",
+  preparation_status_changed: "Preparação atualizada",
+  decision_maker_search: "Pesquisa de decisor",
+  meeting_scheduled: "Reunião marcada",
+  closed_won: "Negócio fechado",
+  lead_discarded: "Lead descartado",
+  archived: "Lead arquivado",
+};
+
+function eventLabel(type: string): string {
+  if (EVENT_LABELS[type]) return EVENT_LABELS[type];
+  if (type.startsWith("status_")) return `Status: ${type.replace("status_", "").replace(/_/g, " ")}`;
+  if (type.startsWith("meeting_")) return `Reunião: ${type.replace("meeting_", "").replace(/_/g, " ")}`;
+  return type.replace(/_/g, " ");
+}
+
+export function RecentActivity({ events }: { events: ActivityEvent[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Distribuição por categoria</CardTitle>
+        <CardTitle>Atividades recentes</CardTitle>
       </CardHeader>
       <CardContent>
-        {categoryData.length === 0 ? (
-          <p className="text-sm text-muted">Sem dados ainda.</p>
+        {!events.length ? (
+          <p className="text-sm text-muted">Nenhuma atividade registrada.</p>
         ) : (
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2b2620" />
-                <XAxis dataKey="name" stroke="#a89e8f" fontSize={11} tickLine={false} />
-                <YAxis stroke="#a89e8f" fontSize={11} tickLine={false} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ background: "#1c1916", border: "1px solid #2b2620", borderRadius: 8, fontSize: 12 }}
-                  labelStyle={{ color: "#f3ede4" }}
-                />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {categoryData.map((entry, i) => (
-                    <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ul className="flex flex-col gap-2 text-sm">
+            {events.map((event) => (
+              <li
+                key={event.id}
+                className="flex items-center justify-between gap-3 border-b border-border pb-2 last:border-0"
+              >
+                <span className="text-foreground">{eventLabel(event.event_type)}</span>
+                <span className="shrink-0 text-xs text-muted" title={formatDate(event.created_at)}>
+                  {formatHumanDate(event.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </CardContent>
     </Card>

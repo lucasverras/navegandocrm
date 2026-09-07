@@ -19,6 +19,48 @@ export const CATEGORIES = [
 
 export type Category = (typeof CATEGORIES)[number];
 
+// Human, Portuguese labels for Google Places types. Single source of truth — reused by the
+// leads table, cards, triage, detail and filters so raw English types (meal_takeaway, ...) are
+// never shown to the operator. Google can return types outside CATEGORIES, so `categoryLabel`
+// falls back to a de-slugged version rather than the raw token.
+export const CATEGORY_LABELS: Record<string, string> = {
+  restaurant: "Restaurante",
+  bar: "Bar",
+  cafe: "Cafeteria",
+  bakery: "Padaria",
+  meal_takeaway: "Delivery / Retirada",
+  steak_house: "Churrascaria",
+  hamburger_restaurant: "Hamburgueria",
+  pizza_restaurant: "Pizzaria",
+  brazilian_restaurant: "Comida brasileira",
+  italian_restaurant: "Comida italiana",
+  japanese_restaurant: "Comida japonesa",
+  seafood_restaurant: "Frutos do mar",
+  dessert_shop: "Doceria",
+  ice_cream_shop: "Sorveteria",
+  coffee_shop: "Café",
+  sandwich_shop: "Sanduicheria",
+  // Common extra types Google occasionally returns:
+  food: "Alimentação",
+  point_of_interest: "Estabelecimento",
+  establishment: "Estabelecimento",
+  fast_food_restaurant: "Fast-food",
+  fine_dining_restaurant: "Alta gastronomia",
+  sushi_restaurant: "Japonês / Sushi",
+  vegetarian_restaurant: "Vegetariano",
+  wine_bar: "Wine bar",
+  pub: "Pub",
+};
+
+export function categoryLabel(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const known = CATEGORY_LABELS[raw];
+  if (known) return known;
+  // De-slug unknown Google types: "korean_restaurant" -> "Korean restaurant".
+  const cleaned = raw.replace(/_/g, " ").trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
 export const COMMERCIAL_STATUSES = [
   "not_contacted",
   "message_ready",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
@@ -10,35 +10,49 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LeadCard } from "@/components/leads/LeadCard";
 import { LeadsFilters } from "@/components/leads/LeadsFilters";
 import { BulkActionsBar } from "@/components/leads/BulkActionsBar";
-import { formatHumanDate, daysFromNow } from "@/lib/utils";
-import { PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
+import { daysFromNow } from "@/lib/utils";
+import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type { LeadWithRegion } from "@/app/(dashboard)/leads/page";
 import type { RegionRow } from "@/types/database";
-import { Users } from "lucide-react";
+import { Users, Trash2 } from "lucide-react";
 
-const STATUS_LABEL: Record<string, string> = {
-  not_contacted: "Não abordado",
-  message_ready: "Mensagem pronta",
-  message_sent: "Enviada",
-  invalid_number: "Número inválido",
-  chatbot: "Chatbot",
-  reception_answered: "Recepção respondeu",
-  forwarded: "Encaminhado",
-  owner_contact_obtained: "Contato do dono obtido",
-  awaiting_reply: "Aguardando retorno",
-  no_reply: "Sem resposta",
-  not_interested: "Não interessado",
-  meeting_scheduled: "Reunião marcada",
-};
+// The single most useful thing to do next with this lead — surfaced as a table column so the
+// operator scans "what do I do" instead of decoding raw status fields.
+function nextAction(lead: LeadWithRegion): { label: string; overdue: boolean } {
+  if (lead.pipeline_stage === "closed") return { label: "Fechado", overdue: false };
+  const followDays = daysFromNow(lead.next_follow_up_at);
+  if (followDays !== null && followDays < 0) return { label: "Follow-up atrasado", overdue: true };
+  if (lead.ai_score == null) return { label: "Analisar com IA", overdue: false };
+  if (lead.commercial_status === "message_ready") return { label: "Enviar mensagem", overdue: false };
+  if (lead.commercial_status === "not_contacted") return { label: "Gerar mensagem", overdue: false };
+  if (lead.next_follow_up_at) return { label: "Fazer follow-up", overdue: false };
+  return { label: "Definir próximo passo", overdue: false };
+}
 
 export function LeadsExplorer({
   leads,
   regions,
+  page,
+  totalPages,
+  total,
 }: {
   leads: LeadWithRegion[];
   regions: Pick<RegionRow, "id" | "neighborhood" | "city">[];
+  page: number;
+  totalPages: number;
+  total: number;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function goToPage(next: number) {
+    const p = new URLSearchParams(searchParams.toString());
+    if (next <= 1) p.delete("page");
+    else p.set("page", String(next));
+    router.push(`${pathname}?${p.toString()}`);
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [analyzing, startAnalyzing] = useTransition();
   const [view, setView] = useState<"table" | "cards">("table");
@@ -97,6 +111,21 @@ export function LeadsExplorer({
     []
   );
 
+  async function handleDiscardOne(id: string, name: string) {
+    if (!window.confirm(`Descartar "${name}"? Ele sai da lista de leads ativos.`)) return;
+    const res = await fetch("/api/leads/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadIds: [id], action: "discard" }),
+    });
+    if (!res.ok) {
+      toast.error("Erro ao descartar");
+      return;
+    }
+    toast.success(`${name} descartado`);
+    router.refresh();
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <LeadsFilters regions={regions} />
@@ -143,22 +172,20 @@ export function LeadsExplorer({
               <Th>
                 <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-accent" />
               </Th>
-              <Th>Nome</Th>
+              <Th>Lead</Th>
               <Th>Região</Th>
-              <Th>Categoria</Th>
-              <Th>Pré-score</Th>
-              <Th>Score IA</Th>
+              <Th>Score</Th>
               <Th>Etapa</Th>
-              <Th>Responsável</Th>
-              <Th>Última atividade</Th>
-              <Th>Próximo follow-up</Th>
-              <Th>Status</Th>
+              <Th>Próxima ação</Th>
               <Th>Ações</Th>
             </Tr>
           </THead>
           <TBody>
             {leads.map((lead) => {
-              const overdue = (daysFromNow(lead.next_follow_up_at) ?? 0) < 0;
+              // Só mostra pré-score quando ainda não há score de IA (o de IA prevalece).
+              const hasAi = lead.ai_score != null;
+              const score = hasAi ? lead.ai_score! : lead.pre_score;
+              const action = nextAction(lead);
               return (
                 <Tr key={lead.id}>
                   <Td>
@@ -173,33 +200,35 @@ export function LeadsExplorer({
                     <Link href={`/leads/${lead.id}`} className="font-medium text-foreground hover:text-accent-2">
                       {lead.name}
                     </Link>
-                    <div className="text-xs text-muted">{lead.address}</div>
+                    <div className="text-xs text-muted">{categoryLabel(lead.category)}</div>
                   </Td>
                   <Td className="text-xs">{lead.regions?.neighborhood ?? "—"}</Td>
-                  <Td className="text-xs">{lead.category}</Td>
                   <Td>
-                    <Badge tone={scoreColor(lead.pre_score)}>{lead.pre_score}</Badge>
-                  </Td>
-                  <Td>
-                    {lead.ai_score != null ? <Badge tone={scoreColor(lead.ai_score)}>{lead.ai_score}</Badge> : "—"}
+                    <Badge tone={scoreColor(score)}>{score}</Badge>
+                    {!hasAi && <span className="ml-1 text-[10px] text-muted">pré</span>}
                   </Td>
                   <Td>
                     <Badge tone="accent">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
                   </Td>
-                  <Td className="text-xs">{lead.assigned_to ?? "—"}</Td>
-                  <Td className="text-xs">{formatHumanDate(lead.last_activity_at)}</Td>
                   <Td className="text-xs">
-                    {lead.next_follow_up_at ? (
-                      <Badge tone={overdue ? "danger" : "muted"}>{formatHumanDate(lead.next_follow_up_at)}</Badge>
-                    ) : (
-                      "—"
-                    )}
+                    <span className={action.overdue ? "text-danger" : "text-foreground"}>{action.label}</span>
                   </Td>
-                  <Td className="text-xs">{STATUS_LABEL[lead.commercial_status] ?? lead.commercial_status}</Td>
                   <Td>
-                    <Link href={`/leads/${lead.id}`} className="text-xs text-accent-2 hover:underline">
-                      Abrir
-                    </Link>
+                    <div className="flex items-center gap-1">
+                      <LeadQuickActions lead={lead} />
+                      <button
+                        type="button"
+                        onClick={() => handleDiscardOne(lead.id, lead.name)}
+                        title="Descartar lead"
+                        aria-label="Descartar lead"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-hover hover:text-danger"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <Link href={`/leads/${lead.id}`} className="ml-1 text-xs text-accent-2 hover:underline">
+                        Abrir
+                      </Link>
+                    </div>
                   </Td>
                 </Tr>
               );
@@ -211,6 +240,32 @@ export function LeadsExplorer({
           {leads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} selected={selected.has(lead.id)} onToggle={toggleOne} />
           ))}
+        </div>
+      )}
+
+      {leads.length > 0 && (
+        <div className="flex items-center justify-between text-xs text-muted">
+          <span>
+            {total} lead(s) · página {page} de {totalPages}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => goToPage(page - 1)}
+              className="rounded-md border border-border px-3 py-1.5 hover:text-foreground disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              disabled={page >= totalPages}
+              onClick={() => goToPage(page + 1)}
+              className="rounded-md border border-border px-3 py-1.5 hover:text-foreground disabled:opacity-40"
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       )}
     </div>

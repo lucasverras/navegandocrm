@@ -22,16 +22,19 @@ export default async function LeadsPage({
     discoveredDays?: string;
     lastContactDays?: string;
     sort?: string;
+    page?: string;
   }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
 
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, Number(params.page) || 1);
+
   let query = supabase
     .from("leads")
-    .select("*, regions(id, neighborhood, city)")
-    .is("archived_at", null)
-    .limit(500);
+    .select("*, regions(id, neighborhood, city)", { count: "exact" })
+    .is("archived_at", null);
 
   if (params.region) query = query.eq("region_id", params.region);
   if (params.category) query = query.eq("category", params.category);
@@ -91,18 +94,21 @@ export default async function LeadsPage({
       query = query.order("pre_score", { ascending: false });
   }
 
-  const { data: leads } = await query;
-  const typedLeads = leads as unknown as LeadWithRegion[] | null;
+  query = query.range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-  const { data: regions } = await supabase
-    .from("regions")
-    .select("id, neighborhood, city")
-    .order("neighborhood", { ascending: true });
+  // Leads + regions are independent — run them in parallel instead of a serial waterfall.
+  const [{ data: leads, count }, { data: regions }] = await Promise.all([
+    query,
+    supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }),
+  ]);
+  const typedLeads = leads as unknown as LeadWithRegion[] | null;
+  const total = count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeading eyebrow="Prospecção" title="Leads" subtitle="Selecione e clique em “Analisar com IA” para transformar dados em oportunidade." />
-      <LeadsExplorer leads={typedLeads ?? []} regions={regions ?? []} />
+      <LeadsExplorer leads={typedLeads ?? []} regions={regions ?? []} page={page} totalPages={totalPages} total={total} />
     </div>
   );
 }

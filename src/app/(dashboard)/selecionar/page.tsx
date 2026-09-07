@@ -7,7 +7,7 @@ export default async function SelecionarPage() {
   const { data: leadsRaw } = await supabase
     .from("leads")
     .select(
-      "id, name, category, address, phone, website, google_rating, google_review_count, price_level, maps_url, pre_score"
+      "id, name, category, address, phone, website, google_rating, google_review_count, price_level, maps_url, pre_score, instagram, instagram_handle, instagram_url, discovery_campaign_id"
     )
     .eq("triage_status", "pending_review")
     .order("pre_score", { ascending: false })

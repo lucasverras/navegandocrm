@@ -1,119 +1,185 @@
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
-import { formatDate } from "@/lib/utils";
+import { StatusStrip, type StatusItem } from "@/components/dashboard/StatusStrip";
+import { FazerAgora, type TodoItem } from "@/components/dashboard/FazerAgora";
+import { RecentActivity, type ActivityEvent } from "@/components/dashboard/DashboardCharts";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { daysFromNow } from "@/lib/utils";
+
+type ActionLead = { id: string; name: string; phone: string | null };
+type OverdueLead = ActionLead & { next_follow_up_at: string | null };
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
+  const endOfTodayIso = endOfToday.toISOString();
+
   const [
-    { count: regionsCount },
-    { count: leadsCount },
-    { count: analyzedCount },
-    { count: strongOpportunities },
-    { count: decisionMakersFound },
-    { count: messagesGenerated },
-    { count: messagesSent },
-    { count: meetingsScheduled },
-    { count: discardedCount },
-    { data: leadsByCategory },
-    { data: topLeads },
+    // --- Operational status strip (all count-only, head:true) ---
+    { count: awaitingTriage },
+    { count: awaitingPreparation },
+    { count: readyToApproach },
+    { count: followUpsToday },
+    { count: awaitingReplies },
+    { count: meetings },
+    { count: totalLeads },
+    // --- "Fazer agora" sources (all bounded) ---
+    { data: readyLeadsData },
+    { data: overdueLeadsData },
+    { data: dmRows },
+    // --- Recent activity ---
     { data: recentEvents },
   ] = await Promise.all([
-    supabase.from("regions").select("id", { count: "exact", head: true }),
+    // Aguardando triagem
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("triage_status", "pending_review")
+      .is("archived_at", null),
+    // Aguardando preparação (aprovados que ainda não estão prontos)
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("triage_status", "approved")
+      .neq("preparation_status", "ready")
+      .is("archived_at", null),
+    // Prontos para abordar
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("preparation_status", "ready")
+      .eq("commercial_status", "not_contacted")
+      .is("archived_at", null),
+    // Follow-ups hoje (<= fim do dia, definido, não fechado)
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .not("next_follow_up_at", "is", null)
+      .lte("next_follow_up_at", endOfTodayIso)
+      .neq("pipeline_stage", "closed")
+      .is("archived_at", null),
+    // Respostas aguardando
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("commercial_status", "awaiting_reply")
+      .is("archived_at", null),
+    // Reuniões (status comercial OU etapa de reunião/proposta)
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .or("commercial_status.eq.meeting_scheduled,pipeline_stage.eq.meeting_proposal")
+      .is("archived_at", null),
+    // Total de restaurantes (linha secundária)
     supabase.from("leads").select("id", { count: "exact", head: true }),
-    supabase.from("lead_analysis").select("id", { count: "exact", head: true }),
-    supabase.from("lead_analysis").select("id", { count: "exact", head: true }).gte("opportunity_score", 70),
-    supabase.from("decision_makers").select("id", { count: "exact", head: true }).eq("found", true),
-    supabase.from("outreach_messages").select("id", { count: "exact", head: true }),
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("commercial_status", "message_sent"),
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("commercial_status", "meeting_scheduled"),
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("business_status", "not_interested"),
-    supabase.from("leads").select("category"),
-    supabase.from("leads").select("id, name, pre_score, ai_score").order("pre_score", { ascending: false }).limit(5),
-    supabase.from("outreach_events").select("*").order("created_at", { ascending: false }).limit(10),
+    // (a) Prontos para abordar / mensagem pronta — limit 12
+    supabase
+      .from("leads")
+      .select("id, name, phone")
+      .eq("preparation_status", "ready")
+      .eq("commercial_status", "not_contacted")
+      .is("archived_at", null)
+      .order("pre_score", { ascending: false })
+      .limit(12),
+    // (c) Follow-ups atrasados — limit 12
+    supabase
+      .from("leads")
+      .select("id, name, phone, next_follow_up_at")
+      .not("next_follow_up_at", "is", null)
+      .lt("next_follow_up_at", nowIso)
+      .neq("pipeline_stage", "closed")
+      .is("archived_at", null)
+      .order("next_follow_up_at", { ascending: true })
+      .limit(12),
+    // (b) source: decisores encontrados — limit 50 (cruzado com leads não abordados abaixo)
+    supabase.from("decision_makers").select("lead_id").eq("found", true).limit(50),
+    // Atividades recentes — limit 10
+    supabase.from("outreach_events").select("id, event_type, created_at").order("created_at", { ascending: false }).limit(10),
   ]);
 
-  const categoryTally = new Map<string, number>();
-  for (const row of (leadsByCategory ?? []) as { category: string }[]) {
-    categoryTally.set(row.category, (categoryTally.get(row.category) ?? 0) + 1);
-  }
-  const categoryData = Array.from(categoryTally.entries()).map(([name, value]) => ({ name, value }));
+  const readyLeads = (readyLeadsData ?? []) as ActionLead[];
+  const overdueLeads = (overdueLeadsData ?? []) as OverdueLead[];
 
-  const stats = [
-    { label: "Regiões pesquisadas", value: regionsCount ?? 0 },
-    { label: "Restaurantes encontrados", value: leadsCount ?? 0 },
-    { label: "Leads analisados", value: analyzedCount ?? 0 },
-    { label: "Oportunidades fortes", value: strongOpportunities ?? 0 },
-    { label: "Decisores encontrados", value: decisionMakersFound ?? 0 },
-    { label: "Mensagens geradas", value: messagesGenerated ?? 0 },
-    { label: "Mensagens enviadas", value: messagesSent ?? 0 },
-    { label: "Reuniões marcadas", value: meetingsScheduled ?? 0 },
-    { label: "Leads descartados", value: discardedCount ?? 0 },
+  // (b) Decisor encontrado mas ainda não abordado. Bounded follow-up query over the found
+  // decision-maker lead ids, restricted to leads that were never contacted.
+  const dmLeadIds = Array.from(new Set(((dmRows ?? []) as { lead_id: string }[]).map((r) => r.lead_id))).slice(0, 30);
+  let dmLeads: ActionLead[] = [];
+  if (dmLeadIds.length > 0) {
+    const { data } = await supabase
+      .from("leads")
+      .select("id, name, phone")
+      .in("id", dmLeadIds)
+      .eq("commercial_status", "not_contacted")
+      .is("archived_at", null)
+      .limit(12);
+    dmLeads = (data ?? []) as ActionLead[];
+  }
+
+  // Build the ordered to-do list: (a) prontos para abordar, (b) decisor encontrado, (c) atrasados.
+  // Dedupe by lead id (first/highest priority wins) and cap at 10.
+  const seen = new Set<string>();
+  const todo: TodoItem[] = [];
+  const pushTodo = (item: TodoItem) => {
+    if (todo.length >= 10 || seen.has(item.id)) return;
+    seen.add(item.id);
+    todo.push(item);
+  };
+
+  for (const lead of readyLeads) {
+    pushTodo({
+      id: lead.id,
+      name: lead.name,
+      reason: "Mensagem pronta · pronto para abordar",
+      action: "Abordar",
+      href: `/leads/${lead.id}`,
+    });
+  }
+  for (const lead of dmLeads) {
+    pushTodo({
+      id: lead.id,
+      name: lead.name,
+      reason: "Decisor encontrado · ainda não abordado",
+      action: "Abordar",
+      href: `/leads/${lead.id}`,
+    });
+  }
+  for (const lead of overdueLeads) {
+    const overdue = daysFromNow(lead.next_follow_up_at);
+    const reason = overdue != null && overdue < 0 ? `Follow-up atrasado há ${Math.abs(overdue)} dia(s)` : "Follow-up atrasado";
+    const waLink = lead.phone ? buildWhatsAppLink(lead.phone, "") : null;
+    if (waLink) {
+      pushTodo({ id: lead.id, name: lead.name, reason, action: "WhatsApp", href: waLink, external: true });
+    } else {
+      pushTodo({ id: lead.id, name: lead.name, reason, action: "Fazer follow-up", href: `/leads/${lead.id}` });
+    }
+  }
+
+  const statusItems: StatusItem[] = [
+    { label: "Aguardando triagem", value: awaitingTriage ?? 0, href: "/selecionar" },
+    { label: "Aguardando preparação", value: awaitingPreparation ?? 0, href: "/preparar" },
+    { label: "Prontos para abordar", value: readyToApproach ?? 0, href: "/leads" },
+    { label: "Follow-ups hoje", value: followUpsToday ?? 0, href: "/hoje" },
+    { label: "Respostas aguardando", value: awaitingReplies ?? 0, href: "/hoje" },
+    { label: "Reuniões", value: meetings ?? 0, href: "/pipeline" },
   ];
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading eyebrow="Visão geral" title="Funil de prospecção" subtitle="O movimento real por trás dos números: leads, oportunidades e conversas em andamento." />
+      <PageHeading
+        eyebrow="Operação"
+        title="Radar do dia"
+        subtitle="Menos análise, mais operação. O que precisa da sua ação agora — na ordem em que importa."
+      />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="relative overflow-hidden">
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent to-accent-2" />
-            <CardContent className="pt-5">
-              <p className="font-display text-3xl font-extrabold tracking-tight text-foreground">{stat.value}</p>
-              <p className="mt-1 text-xs text-muted">{stat.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <StatusStrip items={statusItems} totalLeads={totalLeads ?? 0} />
 
-      <DashboardCharts categoryData={categoryData} />
+      <FazerAgora items={todo} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Leads com maior nota</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!topLeads?.length ? (
-              <p className="text-sm text-muted">Nenhum lead ainda.</p>
-            ) : (
-              <ul className="flex flex-col gap-2 text-sm">
-                {(topLeads as { id: string; name: string; pre_score: number; ai_score: number | null }[]).map((lead) => (
-                  <li key={lead.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
-                    <span>{lead.name}</span>
-                    <span className="text-muted">
-                      pré {lead.pre_score} {lead.ai_score != null ? `· ia ${lead.ai_score}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Atividades recentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!recentEvents?.length ? (
-              <p className="text-sm text-muted">Nenhuma atividade registrada.</p>
-            ) : (
-              <ul className="flex flex-col gap-2 text-sm">
-                {(recentEvents as { id: string; event_type: string; created_at: string }[]).map((event) => (
-                  <li key={event.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
-                    <span className="text-xs">{event.event_type}</span>
-                    <span className="text-xs text-muted">{formatDate(event.created_at)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <RecentActivity events={(recentEvents ?? []) as ActivityEvent[]} />
     </div>
   );
 }

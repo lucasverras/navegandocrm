@@ -112,7 +112,7 @@ export interface LeadRow {
   instagram_handle: string | null;
   instagram_url: string | null;
   instagram_confirmed: boolean;
-  instagram_confirmation_method: "manual" | "ai_search" | null;
+  instagram_confirmation_method: "manual" | "ai_search" | "website_url" | "website_html" | null;
   instagram_checked_at: string | null;
   created_at: string;
   updated_at: string;

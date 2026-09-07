@@ -88,7 +88,25 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const { data: leadsRaw, error } = await admin.from("leads").select("*").in("id", idsToProcess);
   if (error || !leadsRaw) return NextResponse.json({ error: "Erro ao buscar leads" }, { status: 500 });
-  const leads = leadsRaw as unknown as LeadRow[];
+  // Never spend OpenAI budget on leads that failed triage — skip them silently (don't error the batch).
+  const leads = (leadsRaw as unknown as LeadRow[]).filter(
+    (lead) => lead.triage_status !== "rejected" && lead.triage_status !== "auto_filtered"
+  );
+
+  // Batched staleness lookup: one query for the latest analysis per lead instead of one round-trip per lead.
+  const latestAnalysisByLead = new Map<string, string>();
+  if (!force && leads.length > 0) {
+    const { data: recentRaw } = await admin
+      .from("lead_analysis")
+      .select("lead_id, created_at")
+      .in("lead_id", idsToProcess)
+      .order("created_at", { ascending: false });
+    const recentRows = (recentRaw ?? []) as unknown as { lead_id: string; created_at: string }[];
+    for (const row of recentRows) {
+      // rows are newest-first — keep only the first (latest) created_at seen per lead.
+      if (!latestAnalysisByLead.has(row.lead_id)) latestAnalysisByLead.set(row.lead_id, row.created_at);
+    }
+  }
 
   const client = getOpenAIClient();
   let analyzed = 0;
@@ -97,15 +115,8 @@ export async function POST(req: NextRequest) {
   for (const lead of leads) {
     try {
       if (!force) {
-        const { data: recentRaw } = await admin
-          .from("lead_analysis")
-          .select("created_at")
-          .eq("lead_id", lead.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const recent = recentRaw as unknown as { created_at: string } | null;
-        if (recent && Date.now() - new Date(recent.created_at).getTime() < STALENESS_WINDOW_MS) {
+        const latest = latestAnalysisByLead.get(lead.id);
+        if (latest && Date.now() - new Date(latest).getTime() < STALENESS_WINDOW_MS) {
           continue; // reuse recent analysis, skip re-spend
         }
       }

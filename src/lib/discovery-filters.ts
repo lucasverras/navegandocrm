@@ -121,6 +121,8 @@ const KNOWN_FRANCHISE_NAMES = [
   "kfc",
   "pizza hut",
   "domino",
+  "ragazzo",
+  "giraffas",
 ];
 
 export function matchesKnownFranchise(name: string): boolean {

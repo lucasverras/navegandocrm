@@ -65,8 +65,10 @@ export const discoveryCampaignUpdateSchema = discoveryCampaignCreateSchema.parti
   status: z.enum(["active", "paused", "archived"]).optional(),
 });
 
+// "pending_review" is the undo target — reverting a triage decision puts the lead back
+// in the queue as if it were never decided.
 export const triageDecisionSchema = z.object({
-  decision: z.enum(["approved", "rejected", "review_later"]),
+  decision: z.enum(["approved", "rejected", "review_later", "pending_review"]),
   rejection_reason: z.string().max(300).optional(),
   approval_notes: z.string().max(1000).optional(),
 });
@@ -88,6 +90,10 @@ export const messageGenerateSchema = z.object({
     .enum(["social_proof", "diagnosis", "question", "expansion", "routing", "agency", "abandoned_instagram"])
     .optional(),
   refine: z.boolean().optional(),
+  // Ask for 3 strategy options (observação/case/direta) in one call instead of a single message.
+  strategies: z.boolean().optional(),
+  // Persist a pre-written message (e.g. an option the user picked) without calling the AI.
+  content: z.string().min(1).max(4000).optional(),
 });
 
 export const messageEditSchema = z.object({
@@ -149,6 +155,12 @@ export const decisionMakerResultSchema = z.object({
   source_title: z.string().nullable().optional(),
   excerpt: z.string().nullable().optional(),
   confidence: z.number().int().min(0).max(100).default(0),
+});
+
+// Body for the handle-only Instagram enrichment route. The body is optional (may be
+// empty) — `force` re-runs enrichment even when a handle is already cached.
+export const instagramEnrichSchema = z.object({
+  force: z.boolean().optional(),
 });
 
 // Structured JSON schema the AI must return for lead analysis (OpenAI Responses API

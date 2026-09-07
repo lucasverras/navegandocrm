@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
+import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
 import { formatHumanDate, daysFromNow } from "@/lib/utils";
-import { PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type { LeadWithRegion } from "@/app/(dashboard)/leads/page";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -64,7 +65,7 @@ export function LeadCard({
             <Badge tone="accent">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
           </div>
 
-          <div className="text-xs text-muted">{lead.category}</div>
+          <div className="text-xs text-muted">{categoryLabel(lead.category)}</div>
 
           <div className="flex items-center justify-between text-xs text-muted">
             <span>Responsável: {lead.assigned_to ?? "—"}</span>
@@ -81,6 +82,10 @@ export function LeadCard({
           </div>
         </CardContent>
       </Link>
+      {/* Channel actions live outside the Link to avoid nested anchors. */}
+      <div className="flex items-center border-t border-border px-4 py-2 pl-8">
+        <LeadQuickActions lead={lead} />
+      </div>
     </Card>
   );
 }

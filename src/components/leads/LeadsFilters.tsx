@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
-import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, CATEGORIES } from "@/types/domain";
+import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, CATEGORIES, categoryLabel } from "@/types/domain";
 import type { RegionRow } from "@/types/database";
 
 const SORT_OPTIONS: { value: string; label: string }[] = [
@@ -57,7 +57,7 @@ export function LeadsFilters({ regions }: { regions: Pick<RegionRow, "id" | "nei
         <option value="">Todas as categorias</option>
         {CATEGORIES.map((c) => (
           <option key={c} value={c}>
-            {c}
+            {categoryLabel(c)}
           </option>
         ))}
       </select>

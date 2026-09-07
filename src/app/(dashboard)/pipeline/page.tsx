@@ -32,11 +32,7 @@ export default async function PipelinePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading
-        eyebrow="Funil comercial"
-        title="Pipeline"
-        subtitle="Arraste os leads entre as etapas ou use o menu “Mover para” em cada card."
-      />
+      <PageHeading eyebrow="Funil comercial" title="Pipeline" />
       <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} />
     </div>
   );

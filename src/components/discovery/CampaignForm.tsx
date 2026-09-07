@@ -6,26 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { CATEGORIES } from "@/types/domain";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  restaurant: "Restaurantes",
-  bar: "Bares",
-  cafe: "Cafeterias",
-  bakery: "Padarias",
-  meal_takeaway: "Comida para viagem",
-  steak_house: "Churrascarias",
-  hamburger_restaurant: "Hamburguerias",
-  pizza_restaurant: "Pizzarias",
-  brazilian_restaurant: "Comida brasileira",
-  italian_restaurant: "Comida italiana",
-  japanese_restaurant: "Comida japonesa",
-  seafood_restaurant: "Frutos do mar",
-  dessert_shop: "Docerias",
-  ice_cream_shop: "Sorveterias",
-  coffee_shop: "Cafés",
-  sandwich_shop: "Sanduicherias",
-};
+import { CATEGORIES, CATEGORY_LABELS } from "@/types/domain";
 
 const defaultForm = {
   name: "",
