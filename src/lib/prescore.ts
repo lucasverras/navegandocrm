@@ -56,6 +56,9 @@ type PreScoreInput = Pick<
 > & {
   isLikelyIndependent?: boolean;
   instagramFound?: boolean;
+  // When explicitly false (place failed the layered filter), the place is not a prospect and
+  // must not receive a score — a supermarket with 5000 reviews is not a "100/exceptional" lead.
+  eligible?: boolean;
 };
 
 // Computed at insertion time (Discovery). `instagramFound` is only ever true after
@@ -66,6 +69,9 @@ export function calculatePreScore(
   lead: PreScoreInput,
   weights: PreScoreWeights = DEFAULT_PRESCORE_WEIGHTS
 ): number {
+  // Eligibility gate: ineligible places (markets, gas stations, chains…) never get a score.
+  if (lead.eligible === false) return 0;
+
   let score = 0;
 
   // Review count: logarithmic scale, saturates around 300 reviews — avoids a handful of

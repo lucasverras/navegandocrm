@@ -21,27 +21,22 @@ type PrepState = { phase: "idle" | "running" | "ready" | "needs_help"; step?: st
 
 export function PrepareQueue({ leads }: { leads: PrepLead[] }) {
   const router = useRouter();
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [state, setState] = useState<Record<string, PrepState>>({});
+  const [batchRunning, setBatchRunning] = useState(false);
 
   function setPhase(id: string, s: PrepState) {
     setState((prev) => ({ ...prev, [id]: s }));
   }
 
-  async function markStatus(leadId: string, action: "mark_ready" | "mark_partial") {
-    setBusyId(leadId);
-    const res = await fetch(`/api/leads/${leadId}/prepare`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, next_best_action: "Adicionar ao pipeline e abordar" }),
-    });
-    setBusyId(null);
-    if (!res.ok) {
-      toast.error("Erro ao atualizar status de preparação");
-      return;
+  // "Preparar todos" — runs the chain for each not-yet-ready lead, one at a time (a simple
+  // sequential queue keeps the UI responsive and avoids hammering the AI rate limits).
+  async function prepareAll() {
+    setBatchRunning(true);
+    for (const lead of leads) {
+      if (state[lead.id]?.phase === "ready") continue;
+      await autoPrepare(lead);
     }
-    toast.success(action === "mark_ready" ? "Lead marcado como pronto" : "Lead marcado como parcialmente preparado");
-    router.refresh();
+    setBatchRunning(false);
   }
 
   // Chains the whole preparation so the operator doesn't click six sequential buttons across
@@ -107,8 +102,19 @@ export function PrepareQueue({ leads }: { leads: PrepLead[] }) {
     );
   }
 
+  const readyCount = leads.filter((l) => state[l.id]?.phase === "ready").length;
+
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted">
+          <span className="font-semibold text-foreground">{leads.length}</span> selecionado(s)
+          {readyCount > 0 && ` · ${readyCount} pronto(s)`}
+        </p>
+        <Button size="sm" loading={batchRunning} onClick={prepareAll}>
+          <Zap className="h-3.5 w-3.5" /> Preparar todos
+        </Button>
+      </div>
       {leads.map((lead) => {
         const st = state[lead.id]?.phase ?? "idle";
         const running = st === "running";
@@ -145,23 +151,15 @@ export function PrepareQueue({ leads }: { leads: PrepLead[] }) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" loading={running} onClick={() => autoPrepare(lead)}>
+                <Button size="sm" variant="outline" loading={running} onClick={() => autoPrepare(lead)}>
                   <Zap className="h-3.5 w-3.5" />
-                  Preparar automaticamente
+                  Preparar
                 </Button>
                 <Link href={`/leads/${lead.id}`} className="inline-flex">
-                  <Button size="sm" variant="secondary">
+                  <Button size="sm" variant="ghost">
                     Abrir <ExternalLink className="h-3.5 w-3.5" />
                   </Button>
                 </Link>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={busyId === lead.id}
-                  onClick={() => markStatus(lead.id, "mark_ready")}
-                >
-                  Marcar pronto
-                </Button>
               </div>
             </CardContent>
           </Card>

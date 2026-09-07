@@ -25,10 +25,12 @@ export function MessagePanel({ lead, latestMessage }: { lead: LeadRow; latestMes
   const [draft, setDraft] = useState(latestMessage?.content ?? "");
   const [loading, setLoading] = useState<"generate" | "regenerate" | "refine" | "save" | "options" | null>(null);
   const [options, setOptions] = useState<MessageOption[] | null>(null);
+  const [brief, setBrief] = useState<{ specific_observation?: string; unknowns?: string[] } | null>(null);
 
   async function generateOptions() {
     setLoading("options");
     setOptions(null);
+    setBrief(null);
     const res = await fetch(`/api/leads/${lead.id}/message`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,6 +43,7 @@ export function MessagePanel({ lead, latestMessage }: { lead: LeadRow; latestMes
       return;
     }
     setOptions(data.options ?? []);
+    setBrief(data.brief ?? null);
   }
 
   async function applyOption(opt: MessageOption) {
@@ -58,6 +61,7 @@ export function MessagePanel({ lead, latestMessage }: { lead: LeadRow; latestMes
     }
     setDraft(data.message.content);
     setOptions(null);
+    setBrief(null);
     toast.success("Mensagem escolhida");
     router.refresh();
   }
@@ -140,6 +144,16 @@ export function MessagePanel({ lead, latestMessage }: { lead: LeadRow; latestMes
           )
         ) : (
           <p className="text-sm text-muted">Nenhuma mensagem gerada ainda.</p>
+        )}
+
+        {brief?.specific_observation && (
+          <div className="rounded-md border border-border bg-surface-2/60 p-3 text-xs">
+            <span className="text-muted">Observação usada: </span>
+            <span className="text-foreground">{brief.specific_observation}</span>
+            {brief.unknowns && brief.unknowns.length > 0 && (
+              <p className="mt-1 text-muted">Não confirmado: {brief.unknowns.join(" · ")}</p>
+            )}
+          </div>
         )}
 
         {options && options.length > 0 && (

@@ -36,10 +36,11 @@ Regras de linguagem (obrigatórias):
 - Nunca invente fatos. Use só o que está no contexto. Sem observação específica possível? Faça uma pergunta honesta em vez de inventar.
 
 A OBSERVAÇÃO ESPECÍFICA é o mais importante: a primeira frase depois da saudação precisa conter algo que só faz sentido para ESTE restaurante (a categoria, a região, o tipo de casa, o que aparece ou falta no conteúdo).
+TESTE OBRIGATÓRIO: "Esta primeira observação poderia ser enviada para 20 restaurantes diferentes?" Se a resposta for SIM, reescreva com algo específico e verificável antes de finalizar. A observação precisa citar algo concreto do contexto.
 Nível esperado (referência de especificidade, não copie):
 - "Vi que vocês mostram muito bem o prato pronto, mas quase não aparecem o preparo e a equipe."
 - "A casa de vocês parece ter uma pegada de experiência forte, mas isso aparece pouco no perfil."
-PROIBIDO por serem genéricas: "Vi o perfil de vocês e achei que têm potencial." / "Somos especialistas em conteúdo que gera resultados."`;
+PROIBIDO por serem genéricas: "Vi o perfil de vocês e achei que têm potencial." / "Gostei do trabalho de vocês." / "Seu conteúdo é muito interessante." / "Somos especialistas em conteúdo que gera resultados."`;
 
 function variantInstruction(variant: MessageVariant): string {
   switch (variant) {
@@ -92,12 +93,33 @@ function buildContext(
   return lines.filter(Boolean).join("\n");
 }
 
-// Structured output for the 3-strategy mode.
+// Structured output for the 3-strategy mode. The model must first build a LEAD BRIEF (grounding),
+// then write the options — each option's observation must be traceable to the brief.
 const STRATEGIES_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["options"],
+  required: ["brief", "options"],
   properties: {
+    brief: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "business_summary",
+        "specific_observation",
+        "main_opportunity",
+        "relevant_case",
+        "reason_case_is_relevant",
+        "unknowns",
+      ],
+      properties: {
+        business_summary: { type: "string" },
+        specific_observation: { type: "string" },
+        main_opportunity: { type: "string" },
+        relevant_case: { type: "string" },
+        reason_case_is_relevant: { type: "string" },
+        unknowns: { type: "array", items: { type: "string" } },
+      },
+    },
     options: {
       type: "array",
       items: {
@@ -223,11 +245,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         text: { format: { type: "json_schema", name: "message_options", schema: STRATEGIES_SCHEMA, strict: true } },
         input: `${VOICE_RULES}
 
-Gere 3 versões curtas da mensagem, cada uma com uma estratégia diferente. Para cada versão, retorne também "evidence": a evidência concreta do contexto que você usou na observação (bem curta).
+Passo 1 — monte um LEAD BRIEF (campo "brief") a partir SÓ do contexto: business_summary, specific_observation (a observação verificável e específica que passa no teste das 20 mensagens), main_opportunity, relevant_case (nome do case do contexto), reason_case_is_relevant, unknowns (o que falta e você NÃO deve inventar).
+
+Passo 2 — escreva 3 versões curtas, cada uma com uma estratégia. Cada versão tem "evidence": a evidência concreta usada (curta), coerente com brief.specific_observation.
 Estratégias:
-- "observacao": abre com uma observação específica sobre o conteúdo/marketing atual do restaurante.
-- "case": conecta de forma natural com o cliente parecido da Navegando indicado no contexto (Case comparável), sem exagero e sem números.
-- "direta": uma pergunta curta e honesta para descobrir o cenário atual (quem cuida do conteúdo hoje, como fazem).
+- "observacao": abre com a observação específica do brief.
+- "case": conecta de forma natural com relevant_case, sem exagero e sem números.
+- "direta": uma pergunta curta e honesta sobre como o restaurante cuida do conteúdo hoje.
+
+Se não houver observação específica possível, diga isso em unknowns e faça a versão "observacao" também virar uma pergunta honesta — nunca invente.
 
 Contexto:
 ${context}`,
@@ -240,8 +266,10 @@ ${context}`,
     const rawText = extractOutputText(response).trim();
     type RawOption = { strategy: string; message: string; evidence: string };
     let options: (RawOption & { variant: MessageVariant })[] = [];
+    let brief: Record<string, unknown> | null = null;
     try {
-      const json = JSON.parse(rawText) as { options?: RawOption[] };
+      const json = JSON.parse(rawText) as { options?: RawOption[]; brief?: Record<string, unknown> };
+      brief = json.brief ?? null;
       options = (json.options ?? []).map((o) => ({ ...o, variant: STRATEGY_TO_VARIANT[o.strategy] ?? "diagnosis" }));
     } catch {
       return NextResponse.json({ error: "A IA não retornou opções válidas." }, { status: 502 });
@@ -261,7 +289,7 @@ ${context}`,
       regionId: lead.region_id,
     });
 
-    return NextResponse.json({ options });
+    return NextResponse.json({ brief, options });
   }
 
   // ---- Single-message mode (default). ----

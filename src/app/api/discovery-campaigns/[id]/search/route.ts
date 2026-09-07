@@ -142,6 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         price_level: place.priceLevel,
         estimated_units: 1,
         isLikelyIndependent: !matchesKnownFranchise(place.name),
+        eligible: !exclusionReason, // ineligible places get 0, never a high score
       });
 
       const { error: insertError } = await supabase.from("leads").insert({

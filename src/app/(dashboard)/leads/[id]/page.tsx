@@ -8,6 +8,7 @@ import { DecisionMakerPanel } from "@/components/leads/DecisionMakerPanel";
 import { StatusPanel } from "@/components/leads/StatusPanel";
 import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { StageMover } from "@/components/leads/StageMover";
+import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
 import { FollowUpPicker } from "@/components/leads/FollowUpPicker";
 import { RegisterContactButton } from "@/components/leads/RegisterContactButton";
 import { Timeline } from "@/components/leads/Timeline";
@@ -70,7 +71,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="accent">Score {score}</Badge>
-            <Badge tone="default">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
+            <Badge tone="default">{lead.pipeline_stage ? PIPELINE_STAGE_LABELS[lead.pipeline_stage] : "Fora do pipeline"}</Badge>
           </div>
         </div>
 
@@ -99,7 +100,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <WhatsAppButton phone={lead.phone} message={latestMessage?.content ?? ""} />
           <RegisterContactButton leadId={lead.id} />
           <FollowUpPicker leadId={lead.id} current={lead.next_follow_up_at} />
-          <StageMover leadId={lead.id} currentStage={lead.pipeline_stage} />
+          {lead.pipeline_stage ? (
+            <StageMover leadId={lead.id} currentStage={lead.pipeline_stage} />
+          ) : (
+            <AddToPipelineButton leadId={lead.id} />
+          )}
         </div>
       </div>
 

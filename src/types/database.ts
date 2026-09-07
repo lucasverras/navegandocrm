@@ -104,6 +104,7 @@ export interface LeadRow {
     | "existing_client"
     | "already_prospected"
     | "excluded_franchise"
+    | "not_food"
     | null;
   preparation_status: "not_prepared" | "preparing" | "partially_prepared" | "ready" | "outdated" | "failed";
   prepared_at: string | null;

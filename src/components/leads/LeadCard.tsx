@@ -62,7 +62,7 @@ export function LeadCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge tone={scoreTone(lead.pre_score)}>Pré {lead.pre_score}</Badge>
             {lead.ai_score != null && <Badge tone={scoreTone(lead.ai_score)}>IA {lead.ai_score}</Badge>}
-            <Badge tone="accent">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
+            {lead.pipeline_stage && <Badge tone="accent">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>}
           </div>
 
           <div className="text-xs text-muted">{categoryLabel(lead.category)}</div>

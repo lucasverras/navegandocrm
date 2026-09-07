@@ -9,8 +9,11 @@ export default async function PipelinePage() {
   const [{ data: leads }, { data: archived }, { data: regions }] = await Promise.all([
     supabase
       .from("leads")
+      // Only leads consciously added to the pipeline (pipeline_stage set). Raw discovery/triage
+      // rows have a null stage and must never appear on the board.
       .select("*")
       .is("archived_at", null)
+      .not("pipeline_stage", "is", null)
       .order("pipeline_stage", { ascending: true })
       .order("pipeline_position", { ascending: true })
       .limit(500),

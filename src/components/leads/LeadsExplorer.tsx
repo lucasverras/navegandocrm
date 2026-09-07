@@ -208,7 +208,11 @@ export function LeadsExplorer({
                     {!hasAi && <span className="ml-1 text-[10px] text-muted">pré</span>}
                   </Td>
                   <Td>
-                    <Badge tone="accent">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
+                    {lead.pipeline_stage ? (
+                      <Badge tone="accent">{PIPELINE_STAGE_LABELS[lead.pipeline_stage]}</Badge>
+                    ) : (
+                      <span className="text-xs text-muted">—</span>
+                    )}
                   </Td>
                   <Td className="text-xs">
                     <span className={action.overdue ? "text-danger" : "text-foreground"}>{action.label}</span>

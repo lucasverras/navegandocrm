@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { StatusStrip, type StatusItem } from "@/components/dashboard/StatusStrip";
 import { FazerAgora, type TodoItem } from "@/components/dashboard/FazerAgora";
-import { RecentActivity, type ActivityEvent } from "@/components/dashboard/DashboardCharts";
+import { RecentActivity, summarizeToday } from "@/components/dashboard/DashboardCharts";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { daysFromNow } from "@/lib/utils";
 
@@ -17,6 +17,9 @@ export default async function DashboardPage() {
   const endOfToday = new Date(now);
   endOfToday.setHours(23, 59, 59, 999);
   const endOfTodayIso = endOfToday.toISOString();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTodayIso = startOfToday.toISOString();
 
   const [
     // --- Operational status strip (all count-only, head:true) ---
@@ -97,9 +100,17 @@ export default async function DashboardPage() {
       .limit(12),
     // (b) source: decisores encontrados — limit 50 (cruzado com leads não abordados abaixo)
     supabase.from("decision_makers").select("lead_id").eq("found", true).limit(50),
-    // Atividades recentes — limit 10
-    supabase.from("outreach_events").select("id, event_type, created_at").order("created_at", { ascending: false }).limit(10),
+    // Atividades de hoje — agregadas (não listadas linha a linha)
+    supabase
+      .from("outreach_events")
+      .select("event_type, metadata")
+      .gte("created_at", startOfTodayIso)
+      .limit(500),
   ]);
+
+  const activitySummary = summarizeToday(
+    (recentEvents ?? []) as { event_type: string; metadata?: Record<string, unknown> | null }[]
+  );
 
   const readyLeads = (readyLeadsData ?? []) as ActionLead[];
   const overdueLeads = (overdueLeadsData ?? []) as OverdueLead[];
@@ -159,9 +170,9 @@ export default async function DashboardPage() {
   }
 
   const statusItems: StatusItem[] = [
-    { label: "Aguardando triagem", value: awaitingTriage ?? 0, href: "/selecionar" },
-    { label: "Aguardando preparação", value: awaitingPreparation ?? 0, href: "/preparar" },
-    { label: "Prontos para abordar", value: readyToApproach ?? 0, href: "/leads" },
+    { label: "Aguardando triagem", value: awaitingTriage ?? 0, href: "/prospeccao?tab=encontrados" },
+    { label: "Aguardando preparação", value: awaitingPreparation ?? 0, href: "/prospeccao?tab=selecionados" },
+    { label: "Prontos para abordar", value: readyToApproach ?? 0, href: "/prospeccao?tab=prontos" },
     { label: "Follow-ups hoje", value: followUpsToday ?? 0, href: "/hoje" },
     { label: "Respostas aguardando", value: awaitingReplies ?? 0, href: "/hoje" },
     { label: "Reuniões", value: meetings ?? 0, href: "/pipeline" },
@@ -179,7 +190,7 @@ export default async function DashboardPage() {
 
       <FazerAgora items={todo} />
 
-      <RecentActivity events={(recentEvents ?? []) as ActivityEvent[]} />
+      <RecentActivity summary={activitySummary} />
     </div>
   );
 }
