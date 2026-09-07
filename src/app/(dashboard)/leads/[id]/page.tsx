@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/Badge";
 import { MessagePanel } from "@/components/leads/MessagePanel";
 import { DecisionMakerPanel } from "@/components/leads/DecisionMakerPanel";
 import { StatusPanel } from "@/components/leads/StatusPanel";
+import { ResponseActions } from "@/components/leads/ResponseActions";
+import { LeadMobileBar } from "@/components/leads/LeadMobileBar";
 import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { StageMover } from "@/components/leads/StageMover";
 import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
@@ -53,7 +55,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const followUpOverdue = lead.next_follow_up_at ? (daysFromNow(lead.next_follow_up_at) ?? 0) < 0 : false;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-20 md:pb-0">
+      <LeadMobileBar lead={lead} whatsappMessage={latestMessage?.content} />
       {/* Resumo */}
       <div className="relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border bg-surface/80 p-5">
         <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent to-accent-2" />
@@ -217,6 +220,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <DecisionMakerPanel leadId={lead.id} decisionMaker={decisionMaker ?? null} />
         <StatusPanel leadId={lead.id} currentStatus={lead.commercial_status} />
       </div>
+
+      <ResponseActions leadId={lead.id} />
 
       {/* Mensagem */}
       <MessagePanel lead={lead} latestMessage={latestMessage ?? null} />

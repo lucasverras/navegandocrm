@@ -81,9 +81,9 @@ export function LeadDrawer() {
   const score = lead ? lead.ai_score ?? lead.pre_score : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={close}>
+    <div className="animate-fade-in fixed inset-0 z-50 flex justify-end bg-black/50" onClick={close}>
       <aside
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border bg-surface p-5 shadow-2xl"
+        className="animate-slide-in-right flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-border bg-surface p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between gap-2">

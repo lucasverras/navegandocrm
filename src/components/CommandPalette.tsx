@@ -102,9 +102,9 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[12vh]" onClick={close}>
+    <div className="animate-fade-in fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[12vh]" onClick={close}>
       <div
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+        className="animate-scale-in w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-4">

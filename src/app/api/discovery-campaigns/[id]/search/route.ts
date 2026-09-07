@@ -36,6 +36,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Campanha não encontrada" }, { status: 404 });
   }
   const campaign = campaignRaw as unknown as DiscoveryCampaignRow;
+
+  // Global extra blocklist (Configurações → Filtro global) supplements the hardcoded
+  // discovery filter and each campaign's own blocked_keywords. Brands are matched the
+  // same way as keywords, so both lists are merged into blocked_keywords below.
+  const { data: blocklistRaw } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "discovery_blocklist")
+    .maybeSingle();
+  const blocklist = (blocklistRaw as { value: unknown } | null)?.value as
+    | { extra_blocked_keywords?: string[]; extra_blocked_brands?: string[] }
+    | undefined;
+  const extraBlockedKeywords = [
+    ...(blocklist?.extra_blocked_keywords ?? []),
+    ...(blocklist?.extra_blocked_brands ?? []),
+  ];
+
   const effectiveCategories = (parsed.data.categories ?? campaign.included_types) as Parameters<
     typeof searchNearbyByCategory
   >[3][];
@@ -111,7 +128,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         place,
         {
           excluded_types: campaign.excluded_types,
-          blocked_keywords: campaign.blocked_keywords,
+          blocked_keywords: [...campaign.blocked_keywords, ...extraBlockedKeywords],
           min_rating: campaign.min_rating,
           min_reviews: campaign.min_reviews,
           exclude_franchises: campaign.exclude_franchises,

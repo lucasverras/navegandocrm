@@ -24,6 +24,20 @@ export const NAVEGANDO_CASES: NavegandoCase[] = [
     result: "o perfil passou a mostrar o preparo e a rotina da casa com constância, não só a foto do produto pronto",
   },
   {
+    name: "Hippos Burger",
+    categories: ["hamburger_restaurant", "sandwich_shop"],
+    niche: "hamburgueria",
+    did: "captação presencial do preparo, da montagem e do movimento da casa em formatos de alto alcance",
+    result: "o conteúdo passou a mostrar a experiência de comer ali, não só o produto no prato",
+  },
+  {
+    name: "Hippos Pizza",
+    categories: ["pizza_restaurant", "italian_restaurant"],
+    niche: "pizzaria",
+    did: "conteúdo do forno, da abertura da massa e do salão em movimento",
+    result: "a casa passou a comunicar o ritual da pizza e o ambiente, além do cardápio",
+  },
+  {
     name: "La Braciera",
     categories: ["pizza_restaurant", "italian_restaurant"],
     niche: "pizzaria / cozinha italiana",
