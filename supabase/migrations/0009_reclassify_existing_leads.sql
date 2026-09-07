@@ -9,6 +9,14 @@
 -- exposes POST /api/admin/reclassify (reuses the TS classifier). This migration handles the
 -- clear cases automatically so no manual step is required for them.
 
+-- A lead only belongs on the Kanban when it was consciously added. Model "not in the pipeline"
+-- as pipeline_stage IS NULL. Originally the column was NOT NULL DEFAULT 'new' (0003), which both
+-- forced every discovery onto the board and made this reclassification impossible. Relax it:
+-- drop NOT NULL and the default (discovery/triage now leave it null; AddToPipeline sets a stage).
+-- The 0003 CHECK stays and already tolerates null.
+alter table public.leads alter column pipeline_stage drop not null;
+alter table public.leads alter column pipeline_stage drop default;
+
 do $$
 declare
   n_cat int; n_fran int; n_kw int; n_detach int;
