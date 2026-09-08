@@ -3,6 +3,7 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import { HojeFilterBar } from "@/components/hoje/HojeFilterBar";
 import { HojeSection } from "@/components/hoje/HojeSection";
 import { HojeLeadRow } from "@/components/hoje/HojeLeadRow";
+import { TrabalharFila, type FilaDemand } from "@/components/hoje/TrabalharFila";
 import { leadScore, passesFilters, type HojeFilters, type HojeLead } from "@/components/hoje/types";
 import type { OutreachMessageRow } from "@/types/database";
 
@@ -155,26 +156,54 @@ export default async function HojePage({
   const meetingLeads = ((meetingsRes.data ?? []) as HojeLead[]).filter((l) => passesFilters(l, filters));
   const readyLeads = ((readyRes.data ?? []) as HojeLead[]).filter((l) => passesFilters(l, filters));
 
-  // For "mensagens prontas" we need the latest outreach message per lead to power the
-  // WhatsApp quick action. Fetch messages for just those leads, then pick the newest per lead.
-  const readyLeadIds = readyLeads.map((l) => l.id);
+  // "Trabalhar fila": one prioritized list of demands to work one-by-one.
+  // Priority: follow-up atrasado → reunião próxima → follow-up de hoje → pronto para abordar.
+  const demandOrder: { lead: HojeLead; reason: string }[] = [
+    ...overdueLeads.map((l) => ({ lead: l, reason: "Follow-up atrasado" })),
+    ...meetingLeads.map((l) => ({ lead: l, reason: "Reunião" })),
+    ...todayLeads.map((l) => ({ lead: l, reason: "Follow-up de hoje" })),
+    ...readyLeads.map((l) => ({ lead: l, reason: "Pronto para abordar" })),
+  ];
+  const seenDemand = new Set<string>();
+  const demandLeads = demandOrder.filter((d) => (seenDemand.has(d.lead.id) ? false : (seenDemand.add(d.lead.id), true)));
+
+  // Latest message per demand lead (powers the WhatsApp prefill in the fila and ready section).
+  const messageIds = demandLeads.map((d) => d.lead.id);
   const latestMessageByLead = new Map<string, string>();
-  if (readyLeadIds.length > 0) {
+  if (messageIds.length > 0) {
     const { data: messages } = await supabase
       .from("outreach_messages")
       .select("lead_id, content, created_at")
-      .in("lead_id", readyLeadIds)
+      .in("lead_id", messageIds)
       .order("created_at", { ascending: false });
     for (const msg of (messages ?? []) as Pick<OutreachMessageRow, "lead_id" | "content" | "created_at">[]) {
       if (!latestMessageByLead.has(msg.lead_id)) latestMessageByLead.set(msg.lead_id, msg.content);
     }
   }
 
+  const demands: FilaDemand[] = demandLeads.map(({ lead, reason }) => ({
+    id: lead.id,
+    name: lead.name,
+    phone: lead.phone,
+    instagram: lead.instagram,
+    instagram_handle: lead.instagram_handle,
+    instagram_url: lead.instagram_url,
+    website: lead.website,
+    maps_url: lead.maps_url,
+    reason,
+    region: lead.region?.neighborhood ?? null,
+    decisor: null,
+    message: latestMessageByLead.get(lead.id) ?? null,
+  }));
+
   const regions = (regionsRes.data ?? []) as { id: string; neighborhood: string; city: string }[];
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading eyebrow="Rotina diária" title="Hoje" subtitle="Follow-ups, leads parados e a próxima ação certa — na ordem em que importa." />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <PageHeading eyebrow="Rotina diária" title="Hoje" subtitle="Follow-ups, leads parados e a próxima ação certa — na ordem em que importa." />
+        <TrabalharFila demands={demands} />
+      </div>
 
       <HojeFilterBar regions={regions} />
 
