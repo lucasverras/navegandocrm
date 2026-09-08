@@ -30,9 +30,10 @@
   --color-danger: var(--danger);
   --color-success: var(--success);
   --color-warning: var(--warning);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-archivo);
+  --font-display: var(--font-jakarta);
+  --radius: 10px;
 }
 
 * {
