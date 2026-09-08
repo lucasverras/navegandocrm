@@ -201,7 +201,7 @@ export default async function HojePage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <PageHeading eyebrow="Rotina diária" title="Hoje" subtitle="Follow-ups, leads parados e a próxima ação certa — na ordem em que importa." />
+        <PageHeading title="Hoje" />
         <TrabalharFila demands={demands} />
       </div>
 
