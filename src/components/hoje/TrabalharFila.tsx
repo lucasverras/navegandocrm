@@ -43,6 +43,17 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
     router.refresh();
   }
 
+  async function cadence() {
+    if (!current || busy) return;
+    setBusy(true);
+    const res = await fetch(`/api/leads/${current.id}/cadence`, { method: "PATCH" }).catch(() => null);
+    const data = res && res.ok ? await res.json().catch(() => null) : null;
+    setBusy(false);
+    toast.success(data?.days ? `Follow-up em ${data.days} dias (cadência)` : "Follow-up agendado");
+    next();
+    router.refresh();
+  }
+
   async function followUp(days: number, label: string) {
     if (!current || busy) return;
     setBusy(true);
@@ -147,7 +158,7 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
                 <div>
                   <p className="mb-2 text-xs uppercase tracking-wide text-muted">Resultado</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <ResultBtn onClick={() => followUp(2, "Follow-up em 2 dias")} disabled={busy}>
+                    <ResultBtn onClick={cadence} disabled={busy}>
                       Sem resposta
                     </ResultBtn>
                     <ResultBtn onClick={() => response("respondeu")} disabled={busy}>

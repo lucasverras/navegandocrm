@@ -56,7 +56,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const now = new Date().toISOString();
   const stage = (current as { pipeline_stage: string | null }).pipeline_stage;
-  const update: Record<string, unknown> = { last_activity_at: now };
+  // Any registered response cancels the automatic cadence (the lead engaged or is resolved).
+  const update: Record<string, unknown> = { last_activity_at: now, cadence_step: 0 };
   if (rule.commercial) update.commercial_status = rule.commercial;
   if (rule.lost) update.business_status = "not_interested";
   if (rule.followUpDays !== undefined) update.next_follow_up_at = rule.followUpDays == null ? null : daysFromNowIso(rule.followUpDays);

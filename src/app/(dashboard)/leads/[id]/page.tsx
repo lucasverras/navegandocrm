@@ -11,6 +11,7 @@ import { LeadMobileBar } from "@/components/leads/LeadMobileBar";
 import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { StageMover } from "@/components/leads/StageMover";
 import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
+import { MeetingProposalActions } from "@/components/leads/MeetingProposalActions";
 import { FollowUpPicker } from "@/components/leads/FollowUpPicker";
 import { RegisterContactButton } from "@/components/leads/RegisterContactButton";
 import { Timeline } from "@/components/leads/Timeline";
@@ -103,6 +104,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <WhatsAppButton phone={lead.phone} message={latestMessage?.content ?? ""} />
           <RegisterContactButton leadId={lead.id} />
           <FollowUpPicker leadId={lead.id} current={lead.next_follow_up_at} />
+          <MeetingProposalActions leadId={lead.id} />
           {lead.pipeline_stage ? (
             <StageMover leadId={lead.id} currentStage={lead.pipeline_stage} />
           ) : (
