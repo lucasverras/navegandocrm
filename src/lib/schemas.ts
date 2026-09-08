@@ -94,6 +94,11 @@ export const messageGenerateSchema = z.object({
     .enum(["social_proof", "diagnosis", "question", "expansion", "routing", "agency", "abandoned_instagram"])
     .optional(),
   refine: z.boolean().optional(),
+  // Message Studio: free-text steering from the operator ("mais direto", "não fala do perfil",
+  // "usa o case Pecatto"...). Applied on top of the current message when one exists.
+  instruction: z.string().min(2).max(300).optional(),
+  // Message Studio: force a specific Navegando case by name ("Usar outro case").
+  case_name: z.string().max(80).optional(),
   // Ask for 3 strategy options (observação/case/direta) in one call instead of a single message.
   strategies: z.boolean().optional(),
   // Persist a pre-written message (e.g. an option the user picked) without calling the AI.

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { MessagePanel } from "@/components/leads/MessagePanel";
+import { MessageStudio } from "@/components/leads/MessageStudio";
 import { DecisionMakerPanel } from "@/components/leads/DecisionMakerPanel";
 import { StatusPanel } from "@/components/leads/StatusPanel";
 import { ResponseActions } from "@/components/leads/ResponseActions";
@@ -226,7 +226,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       <ResponseActions leadId={lead.id} />
 
       {/* Mensagem */}
-      <MessagePanel lead={lead} latestMessage={latestMessage ?? null} />
+      <MessageStudio lead={lead} latestMessage={latestMessage ?? null} />
 
       {/* Histórico */}
       <Card>

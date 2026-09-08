@@ -12,7 +12,7 @@ import {
   describeOpenAIError,
 } from "@/lib/openai";
 import { checkUsageLimit, logApiUsage } from "@/lib/cost-control";
-import { pickRelevantCase, describeCase } from "@/lib/cases";
+import { pickRelevantCase, describeCase, NAVEGANDO_CASES, type NavegandoCase } from "@/lib/cases";
 import { looksGeneric, REGENERATE_HINT } from "@/lib/message-quality";
 import { categoryLabel } from "@/types/domain";
 import type { MessageVariant } from "@/types/domain";
@@ -67,7 +67,8 @@ function buildContext(
   lead: LeadRow,
   region: Pick<RegionRow, "neighborhood" | "city"> | null,
   decisionMaker: DecisionMakerRow | null,
-  analysis: LeadAnalysisRow | null
+  analysis: LeadAnalysisRow | null,
+  chosenCase: NavegandoCase
 ): string {
   const igHandle = lead.instagram_url ?? lead.instagram_handle ?? lead.instagram;
   const price = lead.price_level ? "$".repeat(Math.min(4, lead.price_level)) : null;
@@ -89,7 +90,7 @@ function buildContext(
     analysis?.opportunity_focus ? `Diagnóstico — foco: ${analysis.opportunity_focus}` : null,
     analysis?.marketing_status ? `Diagnóstico — marketing atual: ${analysis.marketing_status}` : null,
     analysis?.recommended_service ? `Serviço recomendado: ${analysis.recommended_service}` : null,
-    `Case comparável da Navegando: ${describeCase(pickRelevantCase(lead.category))}`,
+    `Case comparável da Navegando: ${describeCase(chosenCase)}`,
   ];
   return lines.filter(Boolean).join("\n");
 }
@@ -177,6 +178,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         input_tokens: 0,
         output_tokens: 0,
         estimated_cost_usd: 0,
+        rationale: { variant: chosenVariant, picked: true },
       })
       .select()
       .single();
@@ -210,7 +212,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const analysis = analysisRaw as unknown as LeadAnalysisRow | null;
   const region = regionRaw as unknown as Pick<RegionRow, "neighborhood" | "city"> | null;
 
-  const refine = !!parsed.data.refine;
+  const instruction = parsed.data.instruction?.trim() || null;
+  const refine = !!parsed.data.refine || !!instruction;
   const usageOperation = refine ? "sonnet_refinement" : "haiku_analysis";
   const usage = await checkUsageLimit(usageOperation);
   if (!usage.allowed) {
@@ -235,7 +238,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const client = getOpenAIClient();
-  const context = buildContext(lead, region, decisionMaker, analysis);
+  // "Usar outro case": the operator can force any case from the library by name.
+  const chosenCase =
+    (parsed.data.case_name && NAVEGANDO_CASES.find((c) => c.name === parsed.data.case_name)) ||
+    pickRelevantCase(lead.category);
+  const context = buildContext(lead, region, decisionMaker, analysis, chosenCase);
 
   // ---- 3-strategy mode: return options, persist nothing until the user picks one. ----
   if (parsed.data.strategies) {
@@ -324,9 +331,27 @@ ${context}`,
     ? " Esta é uma versão refinada: capriche mais na naturalidade e na precisão da observação específica."
     : "";
 
+  // Message Studio: when steering an existing message, give the model the current version to
+  // rewrite — it should apply the adjustment, not start from zero.
+  let currentBlock = "";
+  if (instruction) {
+    const { data: prev } = await admin
+      .from("outreach_messages")
+      .select("content")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const prevContent = (prev as { content: string } | null)?.content;
+    if (prevContent) {
+      currentBlock = `\n\nMensagem atual (reescreva aplicando o ajuste, mantendo o que já funciona):\n"""\n${prevContent}\n"""`;
+    }
+  }
+  const steerBlock = instruction ? `\n\nAJUSTE PEDIDO PELO OPERADOR — aplique obrigatoriamente: ${instruction}` : "";
+
   const buildInput = (extra: string) => `${VOICE_RULES}
 
-Escreva UMA mensagem seguindo: saudação curta → observação específica → o que a Navegando faz (1 frase concreta) → uma pergunta simples.${refineNote} ${variantInstruction(variant)}${extra}
+Escreva UMA mensagem seguindo: saudação curta → observação específica → o que a Navegando faz (1 frase concreta) → uma pergunta simples.${refineNote} ${variantInstruction(variant)}${extra}${steerBlock}${currentBlock}
 
 Contexto:
 ${context}
@@ -371,6 +396,16 @@ Responda apenas com o texto da mensagem, sem aspas, sem comentários.`;
 
   const cost = estimateCostUSD(model, inputTokens, outputTokens);
 
+  // "Por que essa mensagem" — persisted so the studio can always show the grounding (§29).
+  const rationale = {
+    variant,
+    case: chosenCase.name,
+    decisor: decisionMaker?.name ?? null,
+    observation: analysis?.main_opportunity ?? null,
+    marketing_status: analysis?.marketing_status ?? null,
+    instruction,
+  };
+
   const { data: message } = await admin
     .from("outreach_messages")
     .insert({
@@ -383,6 +418,7 @@ Responda apenas com o texto da mensagem, sem aspas, sem comentários.`;
       output_tokens: outputTokens,
       estimated_cost_usd: cost,
       refined: refine,
+      rationale,
     })
     .select()
     .single();
