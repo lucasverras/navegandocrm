@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { FechadoRow, type Fechado } from "@/components/resultados/FechadoRow";
 import { CommissionRow, type CommissionClient } from "@/components/resultados/CommissionRow";
 import { ReimbursementsPanel, type Reimb } from "@/components/resultados/ReimbursementsPanel";
+import { AddClientDialog } from "@/components/resultados/AddClientDialog";
 import {
   BRL,
   isActive,
@@ -30,13 +31,15 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   const tab: Tab = ["fechados", "comissoes", "reembolsos"].includes(tabRaw ?? "") ? (tabRaw as Tab) : "overview";
   const supabase = await createClient();
 
-  const [{ data: clientsRaw }, { data: reimbsRaw }] = await Promise.all([
+  const [{ data: clientsRaw }, { data: reimbsRaw }, { data: regionsRaw }] = await Promise.all([
     supabase.from("leads").select(FIELDS).eq("pipeline_stage", "closed").order("closed_at", { ascending: false, nullsFirst: false }),
     supabase.from("reimbursements").select("id, description, amount, amount_received, status, spent_at").order("created_at", { ascending: false }),
+    supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }),
   ]);
 
   const clients = ((clientsRaw ?? []) as unknown as ClientRow[]).map((c) => ({ ...c, region: c.regions?.neighborhood ?? null }));
   const reimbs = (reimbsRaw ?? []) as unknown as Reimb[];
+  const regions = (regionsRaw ?? []) as { id: string; neighborhood: string; city: string }[];
 
   // KPIs
   const now = new Date();
@@ -63,7 +66,10 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading eyebrow="Comercial" title="Resultados" />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeading eyebrow="Comercial" title="Resultados" />
+        <AddClientDialog regions={regions} />
+      </div>
 
       <div className="flex gap-1 border-b border-border">
         {tabs.map((t) => (
