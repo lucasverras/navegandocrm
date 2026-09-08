@@ -30,7 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     { href: "/hoje", label: "Hoje", icon: "CalendarClock", badge: overdueCount ?? 0 },
     { href: "/prospeccao", label: "Prospecção", icon: "Compass", badge: pendingReviewCount ?? 0 },
     { href: "/pipeline", label: "Pipeline", icon: "KanbanSquare" },
-    { href: "/fechados", label: "Fechados", icon: "Wallet" },
+    { href: "/resultados", label: "Resultados", icon: "Wallet" },
     { href: "/historico", label: "Histórico", icon: "History" },
     { href: "/configuracoes", label: "Configurações", icon: "MapPin" },
   ];

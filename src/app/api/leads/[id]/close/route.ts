@@ -21,6 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const current = currentRaw as unknown as { pipeline_stage: string } | null;
   if (!current) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
 
+  const monthly = parsed.data.monthly_fee ?? parsed.data.closed_value ?? null;
   const { error } = await admin
     .from("leads")
     .update({
@@ -29,8 +30,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       stage_changed_at: now,
       closed_at: now,
       closed_service: parsed.data.closed_service,
-      closed_value: parsed.data.closed_value ?? null,
+      closed_value: monthly,
       closed_note: parsed.data.closed_note ?? null,
+      // Contract + commission — frozen on this client at close time.
+      initial_monthly_fee: monthly,
+      current_monthly_fee: monthly,
+      commission_type: parsed.data.commission_type ?? "one_time_percentage",
+      commission_percent: parsed.data.commission_percent ?? null,
+      churned_at: null,
       last_activity_at: now,
     })
     .eq("id", leadId);

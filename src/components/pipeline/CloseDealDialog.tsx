@@ -11,11 +11,22 @@ export function CloseDealDialog({
 }: {
   lead: LeadRow;
   onCancel: () => void;
-  onConfirm: (payload: { closed_service: string; closed_value: number | null; closed_note: string | null }) => void;
+  onConfirm: (payload: {
+    closed_service: string;
+    closed_value: number | null;
+    closed_note: string | null;
+    monthly_fee: number | null;
+    commission_type: "legacy_recurring" | "one_time_percentage" | "none";
+    commission_percent: number | null;
+  }) => void;
 }) {
   const [service, setService] = useState("");
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
+  const [commissionType, setCommissionType] = useState<"legacy_recurring" | "one_time_percentage" | "none">(
+    "one_time_percentage"
+  );
+  const [commissionPercent, setCommissionPercent] = useState("20");
   const [submitting, setSubmitting] = useState(false);
   const titleId = useId();
 
@@ -32,10 +43,15 @@ export function CloseDealDialog({
   function handleConfirm() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
+    const monthly = value.trim() ? Number(value) : null;
     onConfirm({
       closed_service: service.trim(),
-      closed_value: value.trim() ? Number(value) : null,
+      closed_value: monthly,
       closed_note: note.trim() ? note.trim() : null,
+      monthly_fee: monthly,
+      commission_type: commissionType,
+      commission_percent:
+        commissionType === "none" ? null : commissionType === "legacy_recurring" ? 10 : commissionPercent.trim() ? Number(commissionPercent) : null,
     });
   }
 
@@ -60,15 +76,41 @@ export function CloseDealDialog({
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            <span className="text-foreground">Valor (opcional)</span>
+            <span className="text-foreground">Mensalidade (R$)</span>
             <input
               type="number"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
-              placeholder="Ex: 2500"
+              placeholder="Ex: 4000"
             />
           </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-foreground">Comissão</span>
+              <select
+                value={commissionType}
+                onChange={(e) => setCommissionType(e.target.value as typeof commissionType)}
+                className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+              >
+                <option value="one_time_percentage">Pontual (% de 1 mensalidade)</option>
+                <option value="legacy_recurring">Legado (10% recorrente)</option>
+                <option value="none">Nenhuma</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-foreground">Percentual</span>
+              <input
+                type="number"
+                value={commissionType === "legacy_recurring" ? "10" : commissionPercent}
+                disabled={commissionType !== "one_time_percentage"}
+                onChange={(e) => setCommissionPercent(e.target.value)}
+                className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent disabled:opacity-50"
+                placeholder="20"
+              />
+            </label>
+          </div>
 
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-foreground">Observação (opcional)</span>

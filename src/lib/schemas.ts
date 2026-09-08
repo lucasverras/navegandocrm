@@ -18,6 +18,10 @@ export const closeDealSchema = z.object({
   closed_service: z.string().min(1).max(200),
   closed_value: z.number().min(0).nullable().optional(),
   closed_note: z.string().max(2000).optional(),
+  // Contract + commission (V4). All Navegando contracts are monthly.
+  monthly_fee: z.number().min(0).nullable().optional(),
+  commission_type: z.enum(["legacy_recurring", "one_time_percentage", "none"]).optional(),
+  commission_percent: z.number().min(0).max(100).nullable().optional(),
 });
 
 export const meetingStatusUpdateSchema = z.object({

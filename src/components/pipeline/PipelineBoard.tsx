@@ -178,6 +178,9 @@ export function PipelineBoard({
     closed_service: string;
     closed_value: number | null;
     closed_note: string | null;
+    monthly_fee: number | null;
+    commission_type: "legacy_recurring" | "one_time_percentage" | "none";
+    commission_percent: number | null;
   }) {
     if (!pendingClose) return;
     const { lead, snapshot } = pendingClose;
