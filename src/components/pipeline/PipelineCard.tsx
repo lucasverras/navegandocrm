@@ -3,41 +3,16 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
-import { GripVertical } from "lucide-react";
-import { MessageCircle } from "lucide-react";
-import { Badge } from "@/components/ui/Badge";
-import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
+import { GripVertical, MessageCircle } from "lucide-react";
+import { instagramUrl } from "@/components/leads/LeadQuickActions";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { cn, formatHumanDate, daysFromNow } from "@/lib/utils";
 import type { LeadRow } from "@/types/database";
-import {
-  PIPELINE_STAGES,
-  PIPELINE_STAGE_LABELS,
-  MEETING_STATUSES,
-  MEETING_STATUS_LABELS,
-  categoryLabel,
-} from "@/types/domain";
+import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, MEETING_STATUSES, MEETING_STATUS_LABELS } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
-const COMMERCIAL_STATUS_LABEL: Record<string, string> = {
-  not_contacted: "Não abordado",
-  message_ready: "Mensagem pronta",
-  message_sent: "Enviada",
-  invalid_number: "Número inválido",
-  chatbot: "Chatbot",
-  reception_answered: "Recepção respondeu",
-  forwarded: "Encaminhado",
-  owner_contact_obtained: "Contato do dono obtido",
-  awaiting_reply: "Aguardando retorno",
-  no_reply: "Sem resposta",
-  not_interested: "Não interessado",
-  meeting_scheduled: "Reunião marcada",
-};
-
-function scoreColor(score: number): "success" | "warning" | "muted" {
-  return score >= 70 ? "success" : score >= 40 ? "warning" : "muted";
-}
-
+// Trello-minimal card: name, phone + WhatsApp, @handle + Instagram, and the next date. Nothing
+// else on the face — extra detail lives one click into the lead.
 export function PipelineCard({
   lead,
   regionName,
@@ -58,29 +33,22 @@ export function PipelineCard({
     id: lead.id,
     data: { stage: lead.pipeline_stage },
   });
+  const style = { transform: CSS.Transform.toString(transform), transition };
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const score = lead.ai_score ?? lead.pre_score;
-  const daysInStage = daysFromNow(lead.stage_changed_at);
   const followUpDays = daysFromNow(lead.next_follow_up_at);
   const overdue = followUpDays !== null && followUpDays < 0;
+  const wa = lead.phone ? buildWhatsAppLink(lead.phone, whatsappMessage ?? "") : null;
+  const ig = instagramUrl(lead);
+  const handle = (lead.instagram_handle ?? lead.instagram ?? "").replace(/^@/, "");
 
   function handleCardClick(e: React.MouseEvent) {
-    // The whole card is the drag source; a plain click (no 5px movement, enforced by the
-    // board's PointerSensor activationConstraint) opens the lead. Interactive children mark
-    // themselves [data-no-navigate] so they never navigate or start a drag.
     const target = e.target as HTMLElement;
     if (target.closest("[data-no-navigate]")) return;
     router.push(`/leads/${lead.id}`);
   }
-
-  // Inner controls call this on pointer down so grabbing them never initiates a card drag.
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
-  const contactHref = lead.phone ? buildWhatsAppLink(lead.phone, whatsappMessage ?? "") : null;
+
+  const iconBtn = "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 transition-colors active:scale-90";
 
   return (
     <div
@@ -88,89 +56,47 @@ export function PipelineCard({
       style={style}
       onClick={handleCardClick}
       className={cn(
-        "group flex cursor-grab select-none flex-col gap-2 rounded-lg border border-border bg-surface-2 p-3 text-sm shadow-sm transition-opacity active:cursor-grabbing",
+        "group flex cursor-grab select-none flex-col gap-1.5 rounded-lg border border-border bg-surface p-2.5 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-opacity active:cursor-grabbing",
         isDragging && "opacity-40"
       )}
       {...attributes}
       {...listeners}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <div className="truncate font-medium text-foreground leading-tight">{lead.name}</div>
-          <div className="mt-0.5 text-xs text-muted">{regionName ?? "—"}</div>
+          {regionName && <div className="truncate text-[11px] text-muted">{regionName}</div>}
         </div>
-        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted/40 group-hover:text-muted" aria-hidden />
+        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted/30 group-hover:text-muted" aria-hidden />
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Badge tone="muted" className="text-[10px]">
-          {categoryLabel(lead.category)}
-        </Badge>
-        <Badge tone={scoreColor(score)} className="text-[10px]">
-          {score}
-        </Badge>
-        {overdue && (
-          <Badge tone="danger" className="text-[10px]">
-            Atrasado
-          </Badge>
-        )}
-      </div>
-
-      <div className="text-xs text-muted">
-        {COMMERCIAL_STATUS_LABEL[lead.commercial_status] ?? lead.commercial_status}
-      </div>
-
-      <div className="flex flex-col gap-0.5 text-[11px] text-muted">
-        <span>Última atividade: {formatHumanDate(lead.last_activity_at)}</span>
-        {lead.next_follow_up_at && <span>Follow-up: {formatHumanDate(lead.next_follow_up_at)}</span>}
-        {daysInStage !== null && <span>{daysInStage} dia(s) na etapa</span>}
-        <span>Responsável: {lead.assigned_to ?? "—"}</span>
-      </div>
-
-      <div onPointerDown={stopDrag}>
-        <LeadQuickActions lead={lead} stopNavigation />
-      </div>
-
-      {/* Primary action on the card: reach out on WhatsApp (with the prepared message if any). */}
-      {contactHref ? (
-        <a
-          href={contactHref}
-          target="_blank"
-          rel="noreferrer"
-          data-no-navigate
-          onPointerDown={stopDrag}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-2"
-        >
-          <MessageCircle className="h-4 w-4" /> Entrar em contato
-        </a>
-      ) : (
-        <button
-          type="button"
-          data-no-navigate
-          onPointerDown={stopDrag}
-          onClick={(e) => {
-            e.stopPropagation();
-            router.push(`/leads/${lead.id}`);
-          }}
-          className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-2"
-        >
-          <MessageCircle className="h-4 w-4" /> Entrar em contato
-        </button>
+      {lead.phone && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate tabular-nums text-[13px] text-foreground">{lead.phone}</span>
+          {wa && (
+            <a href={wa} target="_blank" rel="noreferrer" data-no-navigate onPointerDown={stopDrag} onClick={(e) => e.stopPropagation()} title="WhatsApp" className={cn(iconBtn, "text-[#25D366] hover:bg-surface-hover")}>
+              <MessageCircle className="h-4 w-4" />
+            </a>
+          )}
+        </div>
       )}
 
-      <button
-        type="button"
-        data-no-navigate
-        onPointerDown={stopDrag}
-        onClick={(e) => {
-          e.stopPropagation();
-          onLose();
-        }}
-        className="self-end text-[11px] text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-      >
-        Perder
-      </button>
+      {ig && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-[13px] text-accent-2">@{handle}</span>
+          <a href={ig} target="_blank" rel="noreferrer" data-no-navigate onPointerDown={stopDrag} onClick={(e) => e.stopPropagation()} title="Instagram" className={cn(iconBtn, "text-[#E1306C] hover:bg-surface-hover")}>
+            <IgGlyph />
+          </a>
+        </div>
+      )}
+
+      {lead.meeting_at ? (
+        <div className="text-[11px] text-accent-2">Reunião · {formatHumanDate(lead.meeting_at)}</div>
+      ) : lead.next_follow_up_at ? (
+        <div className={cn("text-[11px]", overdue ? "text-danger" : "text-muted")}>
+          {overdue ? "Follow-up atrasado" : "Follow-up"} · {formatHumanDate(lead.next_follow_up_at)}
+        </div>
+      ) : null}
 
       {lead.pipeline_stage === "meeting" && (
         <select
@@ -178,10 +104,10 @@ export function PipelineCard({
           onPointerDown={stopDrag}
           value={lead.meeting_status ?? ""}
           onChange={(e) => onMeetingStatusChange(e.target.value as MeetingStatus)}
-          className="mt-1 rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-foreground"
+          className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] text-foreground"
         >
           <option value="" disabled>
-            Status da reunião...
+            Status…
           </option>
           {MEETING_STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -191,23 +117,45 @@ export function PipelineCard({
         </select>
       )}
 
-      {/* Non-drag fallback for mobile / accessibility */}
-      <select
-        data-no-navigate
-        onPointerDown={stopDrag}
-        value=""
-        onChange={(e) => {
-          if (e.target.value) onMoveTo(e.target.value as PipelineStage);
-        }}
-        className="mt-1 rounded-md border border-border bg-surface px-2 py-1 text-[11px] text-muted md:hidden"
-      >
-        <option value="">Mover para...</option>
-        {PIPELINE_STAGES.filter((s) => s !== lead.pipeline_stage).map((s) => (
-          <option key={s} value={s}>
-            {PIPELINE_STAGE_LABELS[s]}
-          </option>
-        ))}
-      </select>
+      {/* Mobile stage mover (drag is desktop-first) + hover "Perder". */}
+      <div className="flex items-center justify-between gap-2">
+        <select
+          data-no-navigate
+          onPointerDown={stopDrag}
+          value=""
+          onChange={(e) => e.target.value && onMoveTo(e.target.value as PipelineStage)}
+          className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] text-muted md:hidden"
+        >
+          <option value="">Mover…</option>
+          {PIPELINE_STAGES.filter((s) => s !== lead.pipeline_stage).map((s) => (
+            <option key={s} value={s}>
+              {PIPELINE_STAGE_LABELS[s]}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          data-no-navigate
+          onPointerDown={stopDrag}
+          onClick={(e) => {
+            e.stopPropagation();
+            onLose();
+          }}
+          className="ml-auto text-[11px] text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+        >
+          Perder
+        </button>
+      </div>
     </div>
+  );
+}
+
+function IgGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
   );
 }

@@ -12,8 +12,11 @@ export default async function PipelinePage() {
     supabase
       .from("leads")
       // Only leads consciously added to the pipeline (pipeline_stage set). Raw discovery/triage
-      // rows have a null stage and must never appear on the board.
-      .select("*")
+      // rows have a null stage and must never appear on the board. Narrow columns — the Trello
+      // card only needs these; full detail loads when the lead is opened.
+      .select(
+        "id, name, phone, instagram, instagram_handle, instagram_url, pipeline_stage, pipeline_position, region_id, next_follow_up_at, meeting_at, meeting_status, closed_value"
+      )
       .is("archived_at", null)
       .not("pipeline_stage", "is", null)
       .order("pipeline_stage", { ascending: true })
@@ -21,7 +24,7 @@ export default async function PipelinePage() {
       .limit(500),
     supabase
       .from("leads")
-      .select("*")
+      .select("id, name, category, region_id, lost_reason, archived_at")
       .not("archived_at", "is", null)
       .order("updated_at", { ascending: false })
       .limit(200),
