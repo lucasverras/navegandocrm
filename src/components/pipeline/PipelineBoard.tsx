@@ -43,10 +43,12 @@ export function PipelineBoard({
   initialLeads,
   archivedLeads,
   regionMap,
+  messages = {},
 }: {
   initialLeads: LeadRow[];
   archivedLeads: LeadRow[];
   regionMap: Record<string, string>;
+  messages?: Record<string, string>;
 }) {
   const [leads, setLeads] = useState<LeadRow[]>(initialLeads);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -243,6 +245,7 @@ export function PipelineBoard({
                         key={lead.id}
                         lead={lead}
                         regionName={regionMap[lead.region_id]}
+                        whatsappMessage={messages[lead.id]}
                         onMoveTo={(s) => handleMoveTo(lead, s)}
                         onMeetingStatusChange={(status) => handleMeetingStatusChange(lead, status)}
                       />

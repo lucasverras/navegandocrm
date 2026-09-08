@@ -35,6 +35,20 @@ export default async function PipelinePage() {
   const regionMap: Record<string, string> = {};
   for (const r of typedRegions) regionMap[r.id] = r.neighborhood;
 
+  // Latest prepared message per board lead, so "Entrar em contato" opens WhatsApp pre-filled.
+  const messages: Record<string, string> = {};
+  const boardIds = typedLeads.map((l) => l.id);
+  if (boardIds.length) {
+    const { data: msgs } = await supabase
+      .from("outreach_messages")
+      .select("lead_id, content, created_at")
+      .in("lead_id", boardIds)
+      .order("created_at", { ascending: false });
+    for (const m of (msgs ?? []) as { lead_id: string; content: string }[]) {
+      if (!messages[m.lead_id]) messages[m.lead_id] = m.content;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
@@ -54,7 +68,7 @@ export default async function PipelinePage() {
           .
         </p>
       )}
-      <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} />
+      <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} messages={messages} />
     </div>
   );
 }

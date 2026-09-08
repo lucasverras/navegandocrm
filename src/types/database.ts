@@ -94,6 +94,8 @@ export interface LeadRow {
   closed_service: string | null;
   closed_value: number | null;
   closed_note: string | null;
+  churned_at: string | null;
+  received_value: number | null;
   lost_reason: string | null;
   archived_at: string | null;
   discovery_campaign_id: string | null;

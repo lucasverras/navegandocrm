@@ -4,8 +4,10 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/navigation";
 import { GripVertical } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { cn, formatHumanDate, daysFromNow } from "@/lib/utils";
 import type { LeadRow } from "@/types/database";
 import {
@@ -39,11 +41,13 @@ function scoreColor(score: number): "success" | "warning" | "muted" {
 export function PipelineCard({
   lead,
   regionName,
+  whatsappMessage,
   onMoveTo,
   onMeetingStatusChange,
 }: {
   lead: LeadRow;
   regionName: string | undefined;
+  whatsappMessage?: string | null;
   onMoveTo: (stage: PipelineStage) => void;
   onMeetingStatusChange: (status: MeetingStatus) => void;
 }) {
@@ -74,6 +78,7 @@ export function PipelineCard({
 
   // Inner controls call this on pointer down so grabbing them never initiates a card drag.
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
+  const contactHref = lead.phone ? buildWhatsAppLink(lead.phone, whatsappMessage ?? "") : null;
 
   return (
     <div
@@ -123,6 +128,34 @@ export function PipelineCard({
       <div onPointerDown={stopDrag}>
         <LeadQuickActions lead={lead} stopNavigation />
       </div>
+
+      {/* Primary action on the card: reach out on WhatsApp (with the prepared message if any). */}
+      {contactHref ? (
+        <a
+          href={contactHref}
+          target="_blank"
+          rel="noreferrer"
+          data-no-navigate
+          onPointerDown={stopDrag}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-2"
+        >
+          <MessageCircle className="h-4 w-4" /> Entrar em contato
+        </a>
+      ) : (
+        <button
+          type="button"
+          data-no-navigate
+          onPointerDown={stopDrag}
+          onClick={(e) => {
+            e.stopPropagation();
+            router.push(`/leads/${lead.id}`);
+          }}
+          className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-accent-2"
+        >
+          <MessageCircle className="h-4 w-4" /> Entrar em contato
+        </button>
+      )}
 
       {lead.pipeline_stage === "meeting" && (
         <select

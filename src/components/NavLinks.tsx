@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, MapPin, Users, History, CalendarClock, KanbanSquare, Compass, ClipboardCheck, Sparkles } from "lucide-react";
+import { LayoutDashboard, MapPin, Users, History, CalendarClock, KanbanSquare, Compass, ClipboardCheck, Sparkles, Wallet } from "lucide-react";
 
 const ICONS = {
   LayoutDashboard,
@@ -15,6 +15,7 @@ const ICONS = {
   Compass,
   ClipboardCheck,
   Sparkles,
+  Wallet,
 } as const;
 
 export interface NavItem {
