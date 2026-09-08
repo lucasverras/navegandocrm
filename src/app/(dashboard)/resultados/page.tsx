@@ -2,7 +2,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { Table, THead, TBody, Tr, Th } from "@/components/ui/Table";
-import { Card, CardContent } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FechadoRow, type Fechado } from "@/components/resultados/FechadoRow";
 import { CommissionRow, type CommissionClient } from "@/components/resultados/CommissionRow";
@@ -92,21 +91,23 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
       </div>
 
       {tab === "overview" && (
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            <Stat label="Clientes que trouxe" value={String(clients.length)} />
-            <Stat label="Ativos" value={String(activeCount)} />
-            <Stat label="MRR que trouxe" value={BRL.format(mrr)} accent />
-            <Stat label="Receita gerada" value={BRL.format(receita)} accent />
-            <Stat label="Fechamentos no mês" value={String(fechamentosMes)} />
-            <Stat label="Ticket médio" value={BRL.format(ticket)} />
+        <div className="flex flex-col gap-8">
+          {/* Hero — the three numbers that matter most, editorial not boxed. */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <Hero label="Receita gerada p/ Navegando" value={BRL.format(receita)} />
+            <Hero label="MRR que você trouxe" value={BRL.format(mrr)} accent />
+            <Hero label="Total a receber" value={BRL.format(totalReceber)} accent />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <Stat label="Comissões geradas" value={BRL.format(comGerada)} />
-            <Stat label="Comissões recebidas" value={BRL.format(comRecebida)} />
-            <Stat label="Comissões pendentes" value={BRL.format(comPendente)} accent />
-            <Stat label="Reembolsos pendentes" value={BRL.format(reembT.pending)} />
-            <Stat label="Total a receber" value={BRL.format(totalReceber)} accent />
+          {/* Secondary — compact, divided, no boxes. */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-5 border-t border-border pt-6 sm:grid-cols-4">
+            <Mini label="Clientes que trouxe" value={String(clients.length)} />
+            <Mini label="Ativos" value={String(activeCount)} />
+            <Mini label="Ticket médio" value={BRL.format(ticket)} />
+            <Mini label="Fechamentos no mês" value={String(fechamentosMes)} />
+            <Mini label="Comissões geradas" value={BRL.format(comGerada)} />
+            <Mini label="Comissões recebidas" value={BRL.format(comRecebida)} />
+            <Mini label="Comissões pendentes" value={BRL.format(comPendente)} />
+            <Mini label="Reembolsos pendentes" value={BRL.format(reembT.pending)} />
           </div>
         </div>
       )}
@@ -169,16 +170,23 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Hero({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <Card>
-      <CardContent className="pt-4">
-        <p className={`font-display text-xl font-extrabold tabular-nums tracking-tight ${accent ? "text-accent-2" : "text-foreground"}`}>
-          {value}
-        </p>
-        <p className="mt-1 text-xs text-muted">{label}</p>
-      </CardContent>
-    </Card>
+    <div>
+      <p className={`font-display text-[34px] font-extrabold leading-none tracking-tight tabular-nums ${accent ? "text-accent-2" : "text-foreground"}`}>
+        {value}
+      </p>
+      <p className="mt-2 text-xs uppercase tracking-wide text-muted">{label}</p>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-display text-lg font-bold tabular-nums text-foreground">{value}</p>
+      <p className="mt-0.5 text-xs text-muted">{label}</p>
+    </div>
   );
 }
 
