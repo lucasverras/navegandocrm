@@ -19,7 +19,7 @@ import {
   reimbursementTotals,
   type ClientFinance,
 } from "@/lib/finance";
-import { formatDate } from "@/lib/utils";
+import { formatDateOnly } from "@/lib/utils";
 import { Wallet } from "lucide-react";
 
 type Tab = "overview" | "fechados" | "comissoes" | "reembolsos" | "analytics";
@@ -134,7 +134,7 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
                           {c.name}
                         </Link>
                         <p className="truncate text-xs text-muted">
-                          {c.region ?? "Sem região"} · desde {c.closed_at ? formatDate(c.closed_at) : "—"}
+                          {c.region ?? "Sem região"} · desde {c.closed_at ? formatDateOnly(c.closed_at) : "—"}
                           {fee > 0 && ` · ${BRL.format(fee)}/mês`}
                         </p>
                       </div>

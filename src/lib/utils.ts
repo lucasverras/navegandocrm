@@ -19,6 +19,13 @@ export function formatDate(date: string | Date | null | undefined) {
   }).format(d);
 }
 
+// Date without time — for "desde", contract dates and anything calendar-only.
+export function formatDateOnly(date: string | Date | null | undefined) {
+  if (!date) return "—";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
+}
+
 // Humanized date for CRM UIs: "Hoje, 14:30" / "Amanhã, 10:00" / "Ontem, 09:00" /
 // "Há 3 dias" (past, >1 day) / "Em 3 dias" (future, >1 day) / "25 de julho" (>7 days away).
 // Callers should also show the full date (e.g. via `title` attribute) using formatDate().
