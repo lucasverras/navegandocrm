@@ -12,14 +12,17 @@ export async function GET(req: NextRequest) {
   const q = raw.replace(/[,()%*\\]/g, " ").trim();
   if (q.length < 2) return NextResponse.json({ results: [] });
 
+  // `addable=1` → only leads not yet on the pipeline board (used by the "+ Adicionar lead" picker).
+  const addable = req.nextUrl.searchParams.get("addable") === "1";
+
   const admin = createAdminClient();
-  const { data } = await admin
+  let query = admin
     .from("leads")
     .select("id, name, phone, category, instagram, instagram_handle, instagram_url, maps_url, website, pipeline_stage")
     .or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
-    .is("archived_at", null)
-    .order("ai_score", { ascending: false, nullsFirst: false })
-    .limit(8);
+    .is("archived_at", null);
+  if (addable) query = query.is("pipeline_stage", null).neq("triage_status", "auto_filtered").neq("triage_status", "rejected");
 
+  const { data } = await query.order("ai_score", { ascending: false, nullsFirst: false }).limit(8);
   return NextResponse.json({ results: data ?? [] });
 }

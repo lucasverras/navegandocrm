@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
+import { PipelineAddLead } from "@/components/pipeline/PipelineAddLead";
 import type { LeadRow, RegionRow } from "@/types/database";
 
 export default async function PipelinePage() {
@@ -36,7 +37,10 @@ export default async function PipelinePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading eyebrow="Funil comercial" title="Pipeline" />
+      <div className="flex items-start justify-between gap-4">
+        <PageHeading eyebrow="Funil comercial" title="Pipeline" />
+        <PipelineAddLead />
+      </div>
       {typedLeads.length === 0 && (
         <p className="text-sm text-muted">
           Nenhum lead no pipeline ainda. Adicione a partir de{" "}
