@@ -2,13 +2,14 @@
 
 import { ReactNode } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { PIPELINE_STAGE_LABELS } from "@/types/domain";
 import type { PipelineStage } from "@/types/domain";
 import type { LeadRow } from "@/types/database";
 
 const currencyFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+// Trello-light column: narrow, quiet background (not a heavy bordered card), sticky header,
+// discreet counter, and a small "Nenhum lead" line when empty (no giant dashed box).
 export function PipelineColumn({
   stage,
   leads,
@@ -21,32 +22,26 @@ export function PipelineColumn({
   totalValue?: number;
   children: ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: `column-${stage}`,
-    data: { stage },
-  });
+  const { setNodeRef, isOver } = useDroppable({ id: `column-${stage}`, data: { stage } });
 
   return (
-    <div ref={setNodeRef} className="h-full">
-      <Card className={`flex h-full min-w-[280px] max-w-[320px] flex-col ${isOver ? "border-accent" : ""}`}>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center justify-between text-sm">
-            <span>{PIPELINE_STAGE_LABELS[stage]}</span>
-            <span className="text-xs font-normal text-muted">{leads.length}</span>
-          </CardTitle>
-          {totalValue !== undefined && (
-            <div className="mt-1 text-xs text-muted">Total: {currencyFormatter.format(totalValue)}</div>
-          )}
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col gap-2 overflow-y-auto pt-0">
-          {children}
-          {leads.length === 0 && (
-            <div className="rounded-md border border-dashed border-border p-4 text-center text-xs text-muted">
-              Nenhum lead
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div
+      ref={setNodeRef}
+      className={`flex h-full w-[264px] shrink-0 flex-col rounded-lg bg-surface-2/50 transition-colors ${
+        isOver ? "ring-2 ring-accent/50" : ""
+      }`}
+    >
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg bg-surface-2/80 px-3 py-2 backdrop-blur-sm">
+        <span className="text-[13px] font-semibold text-foreground">{PIPELINE_STAGE_LABELS[stage]}</span>
+        <span className="tabular-nums text-xs text-muted">{leads.length}</span>
+      </div>
+      {totalValue !== undefined && totalValue > 0 && (
+        <div className="px-3 pb-1 text-[11px] tabular-nums text-muted">{currencyFormatter.format(totalValue)}</div>
+      )}
+      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 pt-1">
+        {children}
+        {leads.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted/70">Nenhum lead</p>}
+      </div>
     </div>
   );
 }
