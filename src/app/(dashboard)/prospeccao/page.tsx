@@ -6,28 +6,114 @@ import { SelectionQueue } from "@/components/discovery/SelectionQueue";
 import { PrepareQueue } from "@/components/discovery/PrepareQueue";
 import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
 import { categoryLabel } from "@/types/domain";
-import { Inbox, CheckCircle2 } from "lucide-react";
+import { Inbox, CheckCircle2, ChevronRight, MapPin } from "lucide-react";
 
 type Tab = "encontrados" | "selecionados" | "prontos";
+type Counts = { total: number; pending: number; approved: number; ready: number };
 
-export default async function ProspeccaoPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { tab: tabRaw } = await searchParams;
+export default async function ProspeccaoPage({ searchParams }: { searchParams: Promise<{ tab?: string; region?: string }> }) {
+  const { tab: tabRaw, region } = await searchParams;
   const tab: Tab = tabRaw === "selecionados" ? "selecionados" : tabRaw === "prontos" ? "prontos" : "encontrados";
   const supabase = await createClient();
 
-  // Live counts for the three tabs.
+  // First level: no region selected → show the regions with their funnel counts.
+  if (!region) {
+    const [{ data: regionsRaw }, { data: rollupRaw }] = await Promise.all([
+      supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }),
+      supabase.from("leads").select("region_id, triage_status, preparation_status, pipeline_stage").is("archived_at", null),
+    ]);
+    const regions = (regionsRaw ?? []) as { id: string; neighborhood: string; city: string }[];
+    const rollup = (rollupRaw ?? []) as { region_id: string | null; triage_status: string; preparation_status: string; pipeline_stage: string | null }[];
+
+    const byRegion = new Map<string, Counts>();
+    const bump = (key: string, f: (c: Counts) => void) => {
+      const c = byRegion.get(key) ?? { total: 0, pending: 0, approved: 0, ready: 0 };
+      f(c);
+      byRegion.set(key, c);
+    };
+    for (const l of rollup) {
+      const key = l.region_id ?? "none";
+      bump(key, (c) => {
+        c.total += 1;
+        if (l.triage_status === "pending_review") c.pending += 1;
+        if (l.triage_status === "approved") c.approved += 1;
+        if (l.preparation_status === "ready" && l.pipeline_stage == null) c.ready += 1;
+      });
+    }
+
+    const rows = regions.map((r) => ({ ...r, counts: byRegion.get(r.id) ?? { total: 0, pending: 0, approved: 0, ready: 0 } }));
+    const semRegiao = byRegion.get("none");
+
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between gap-4">
+          <PageHeading eyebrow="Prospecção" title="Prospecção" />
+          <Link href="/descobrir" className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white hover:bg-accent-2">
+            + Nova região
+          </Link>
+        </div>
+
+        {rows.length === 0 && !semRegiao ? (
+          <EmptyState icon={<MapPin className="h-8 w-8" />} title="Nenhuma região" description="Crie uma campanha em Descobrir para começar a prospectar." />
+        ) : (
+          <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+            <Link href="/prospeccao?region=all&tab=encontrados" className="flex items-center justify-between px-4 py-3 hover:bg-surface-2">
+              <span className="font-medium text-foreground">Todas as regiões</span>
+              <ChevronRight className="h-4 w-4 text-muted" />
+            </Link>
+            {rows.map((r) => (
+              <Link key={r.id} href={`/prospeccao?region=${r.id}&tab=encontrados`} className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-2">
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground">{r.neighborhood}</div>
+                  <div className="text-xs text-muted">{r.city}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-4 text-xs tabular-nums text-muted">
+                  <Count n={r.counts.total} label="encontrados" />
+                  <Count n={r.counts.pending} label="a revisar" accent={r.counts.pending > 0} />
+                  <Count n={r.counts.approved} label="selecionados" />
+                  <Count n={r.counts.ready} label="prontos" />
+                  <ChevronRight className="h-4 w-4" />
+                </div>
+              </Link>
+            ))}
+            {semRegiao && (
+              <Link href="/prospeccao?region=none&tab=encontrados" className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-surface-2">
+                <div className="font-medium text-foreground">Sem região <span className="text-xs text-muted">(manuais)</span></div>
+                <div className="flex shrink-0 items-center gap-4 text-xs tabular-nums text-muted">
+                  <Count n={semRegiao.total} label="total" />
+                  <ChevronRight className="h-4 w-4" />
+                </div>
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Second level: a region (or "all") selected → the three tabs, scoped.
+  const regionId = region === "all" || region === "none" ? undefined : region;
+  const nullRegion = region === "none";
+  let regionName = "Todas as regiões";
+  if (regionId) {
+    const { data: r } = await supabase.from("regions").select("neighborhood, city").eq("id", regionId).maybeSingle();
+    if (r) regionName = `${(r as { neighborhood: string }).neighborhood}`;
+  } else if (nullRegion) {
+    regionName = "Sem região";
+  }
+
+  const scope = <T,>(q: T): T => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let x: any = q;
+    if (regionId) x = x.eq("region_id", regionId);
+    else if (nullRegion) x = x.is("region_id", null);
+    return x;
+  };
+
   const [{ count: encontrados }, { count: selecionados }, { count: prontos }] = await Promise.all([
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "pending_review"),
-    supabase
-      .from("leads")
-      .select("id", { count: "exact", head: true })
-      .eq("triage_status", "approved")
-      .neq("preparation_status", "ready"),
-    supabase
-      .from("leads")
-      .select("id", { count: "exact", head: true })
-      .eq("preparation_status", "ready")
-      .is("pipeline_stage", null),
+    scope(supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "pending_review")),
+    scope(supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "approved").neq("preparation_status", "ready")),
+    scope(supabase.from("leads").select("id", { count: "exact", head: true }).eq("preparation_status", "ready").is("pipeline_stage", null)),
   ]);
 
   const tabs: { key: Tab; label: string; count: number }[] = [
@@ -38,51 +124,78 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeading eyebrow="Prospecção" title="Prospecção" />
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <Link href="/prospeccao" className="text-xs text-muted hover:text-foreground">
+            ← Regiões
+          </Link>
+          <PageHeading eyebrow="Prospecção" title={regionName} />
+        </div>
+      </div>
 
       <div className="flex gap-1 border-b border-border">
         {tabs.map((t) => (
           <Link
             key={t.key}
-            href={`/prospeccao?tab=${t.key}`}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm ${
-              tab === t.key
-                ? "border-accent text-foreground"
-                : "border-transparent text-muted hover:text-foreground"
-            }`}
+            href={`/prospeccao?region=${region}&tab=${t.key}`}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm ${tab === t.key ? "border-accent text-foreground" : "border-transparent text-muted hover:text-foreground"}`}
           >
             {t.label} <span className="text-xs text-muted">({t.count})</span>
           </Link>
         ))}
       </div>
 
-      {tab === "encontrados" && <EncontradosTab />}
-      {tab === "selecionados" && <SelecionadosTab />}
-      {tab === "prontos" && <ProntosTab />}
+      {tab === "encontrados" && <EncontradosTab regionId={regionId} nullRegion={nullRegion} />}
+      {tab === "selecionados" && <SelecionadosTab regionId={regionId} nullRegion={nullRegion} />}
+      {tab === "prontos" && <ProntosTab regionId={regionId} nullRegion={nullRegion} />}
     </div>
   );
 }
 
-async function EncontradosTab() {
+function Count({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
+  return (
+    <span className="hidden sm:inline">
+      <span className={accent ? "font-semibold text-accent-2" : "font-semibold text-foreground"}>{n}</span> {label}
+    </span>
+  );
+}
+
+function applyScope<T>(q: T, regionId?: string, nullRegion?: boolean): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let x: any = q;
+  if (regionId) x = x.eq("region_id", regionId);
+  else if (nullRegion) x = x.is("region_id", null);
+  return x;
+}
+
+async function EncontradosTab({ regionId, nullRegion }: { regionId?: string; nullRegion?: boolean }) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("leads")
-    .select(
-      "id, name, category, address, phone, website, google_rating, google_review_count, price_level, maps_url, pre_score, instagram, instagram_handle, instagram_url, discovery_campaign_id"
-    )
-    .eq("triage_status", "pending_review")
+  const { data } = await applyScope(
+    supabase
+      .from("leads")
+      .select(
+        "id, name, category, address, phone, website, google_rating, google_review_count, price_level, maps_url, pre_score, instagram, instagram_handle, instagram_url, discovery_campaign_id"
+      )
+      .eq("triage_status", "pending_review"),
+    regionId,
+    nullRegion
+  )
     .order("pre_score", { ascending: false })
     .limit(200);
   return <SelectionQueue leads={data ?? []} />;
 }
 
-async function SelecionadosTab() {
+async function SelecionadosTab({ regionId, nullRegion }: { regionId?: string; nullRegion?: boolean }) {
   const supabase = await createClient();
-  const { data: leadsRaw } = await supabase
-    .from("leads")
-    .select("id, name, category, preparation_status, instagram, ai_score, pre_score")
-    .eq("triage_status", "approved")
-    .neq("preparation_status", "ready")
+  const { data: leadsRaw } = await applyScope(
+    supabase
+      .from("leads")
+      .select("id, name, category, preparation_status, instagram, ai_score, pre_score")
+      .eq("triage_status", "approved")
+      .neq("preparation_status", "ready"),
+    regionId,
+    nullRegion
+  )
     .order("pre_score", { ascending: false })
     .limit(50);
   const leads = leadsRaw ?? [];
@@ -97,45 +210,30 @@ async function SelecionadosTab() {
   const enriched = leads.map((l) => ({ ...l, hasDecisionMaker: dmSet.has(l.id), hasMessage: msgSet.has(l.id) }));
 
   if (!enriched.length) {
-    return (
-      <EmptyState
-        icon={<CheckCircle2 className="h-8 w-8" />}
-        title="Nada para preparar"
-        description="Aprove estabelecimentos em Encontrados para prepará-los aqui."
-      />
-    );
+    return <EmptyState icon={<CheckCircle2 className="h-8 w-8" />} title="Nada para preparar" description="Aprove estabelecimentos em Encontrados para prepará-los aqui." />;
   }
   return <PrepareQueue leads={enriched} />;
 }
 
-async function ProntosTab() {
+async function ProntosTab({ regionId, nullRegion }: { regionId?: string; nullRegion?: boolean }) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("leads")
-    .select("id, name, category, ai_score, pre_score")
-    .eq("preparation_status", "ready")
-    .is("pipeline_stage", null)
+  const { data } = await applyScope(
+    supabase.from("leads").select("id, name, category, ai_score, pre_score").eq("preparation_status", "ready").is("pipeline_stage", null),
+    regionId,
+    nullRegion
+  )
     .order("ai_score", { ascending: false, nullsFirst: false })
     .limit(100);
   const leads = data ?? [];
 
   if (!leads.length) {
-    return (
-      <EmptyState
-        icon={<Inbox className="h-8 w-8" />}
-        title="Nenhum lead pronto"
-        description="Prepare leads em Selecionados para vê-los aqui, prontos para o pipeline."
-      />
-    );
+    return <EmptyState icon={<Inbox className="h-8 w-8" />} title="Nenhum lead pronto" description="Prepare leads em Selecionados para vê-los aqui, prontos para o pipeline." />;
   }
 
   return (
     <div className="flex flex-col gap-2">
       {leads.map((lead) => (
-        <div
-          key={lead.id}
-          className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-4 py-3"
-        >
+        <div key={lead.id} className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-4 py-3">
           <div>
             <Link href={`/leads/${lead.id}`} className="font-medium text-foreground hover:text-accent-2">
               {lead.name}
