@@ -8,6 +8,8 @@ import { FechadoRow, type Fechado } from "@/components/resultados/FechadoRow";
 import { CommissionRow, type CommissionClient } from "@/components/resultados/CommissionRow";
 import { ReimbursementsPanel, type Reimb } from "@/components/resultados/ReimbursementsPanel";
 import { AddClientDialog } from "@/components/resultados/AddClientDialog";
+import { Analytics } from "@/components/resultados/Analytics";
+import { getAnalytics } from "@/components/resultados/analytics-data";
 import {
   BRL,
   isActive,
@@ -20,7 +22,7 @@ import {
 } from "@/lib/finance";
 import { Wallet } from "lucide-react";
 
-type Tab = "overview" | "fechados" | "comissoes" | "reembolsos";
+type Tab = "overview" | "fechados" | "comissoes" | "reembolsos" | "analytics";
 type ClientRow = ClientFinance & { id: string; name: string; lead_origin: string; regions: { neighborhood: string } | null };
 
 const FIELDS =
@@ -28,7 +30,7 @@ const FIELDS =
 
 export default async function ResultadosPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab: tabRaw } = await searchParams;
-  const tab: Tab = ["fechados", "comissoes", "reembolsos"].includes(tabRaw ?? "") ? (tabRaw as Tab) : "overview";
+  const tab: Tab = ["fechados", "comissoes", "reembolsos", "analytics"].includes(tabRaw ?? "") ? (tabRaw as Tab) : "overview";
   const supabase = await createClient();
 
   const [{ data: clientsRaw }, { data: reimbsRaw }, { data: regionsRaw }] = await Promise.all([
@@ -40,6 +42,9 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   const clients = ((clientsRaw ?? []) as unknown as ClientRow[]).map((c) => ({ ...c, region: c.regions?.neighborhood ?? null }));
   const reimbs = (reimbsRaw ?? []) as unknown as Reimb[];
   const regions = (regionsRaw ?? []) as { id: string; neighborhood: string; city: string }[];
+
+  // Analytics queries run only when its tab is active (keeps other tabs untouched).
+  const analytics = tab === "analytics" ? await getAnalytics(supabase) : null;
 
   // KPIs
   const now = new Date();
@@ -62,6 +67,7 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
     { key: "fechados", label: "Fechados" },
     { key: "comissoes", label: "Comissões" },
     { key: "reembolsos", label: "Reembolsos" },
+    { key: "analytics", label: "Analytics" },
   ];
 
   return (
@@ -157,6 +163,8 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
         ))}
 
       {tab === "reembolsos" && <ReimbursementsPanel rows={reimbs} />}
+
+      {tab === "analytics" && analytics && <Analytics data={analytics} />}
     </div>
   );
 }

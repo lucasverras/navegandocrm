@@ -44,12 +44,14 @@ export function PipelineCard({
   whatsappMessage,
   onMoveTo,
   onMeetingStatusChange,
+  onLose,
 }: {
   lead: LeadRow;
   regionName: string | undefined;
   whatsappMessage?: string | null;
   onMoveTo: (stage: PipelineStage) => void;
   onMeetingStatusChange: (status: MeetingStatus) => void;
+  onLose: () => void;
 }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -156,6 +158,19 @@ export function PipelineCard({
           <MessageCircle className="h-4 w-4" /> Entrar em contato
         </button>
       )}
+
+      <button
+        type="button"
+        data-no-navigate
+        onPointerDown={stopDrag}
+        onClick={(e) => {
+          e.stopPropagation();
+          onLose();
+        }}
+        className="self-end text-[11px] text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+      >
+        Perder
+      </button>
 
       {lead.pipeline_stage === "meeting" && (
         <select

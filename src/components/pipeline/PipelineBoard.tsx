@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import { PipelineColumn } from "@/components/pipeline/PipelineColumn";
 import { PipelineCard } from "@/components/pipeline/PipelineCard";
 import { CloseDealDialog } from "@/components/pipeline/CloseDealDialog";
+import { LoseDealDialog } from "@/components/pipeline/LoseDealDialog";
 import { ArchivedLeads } from "@/components/pipeline/ArchivedLeads";
 import type { LeadRow } from "@/types/database";
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS } from "@/types/domain";
@@ -55,6 +56,7 @@ export function PipelineBoard({
   const [mobileStage, setMobileStage] = useState<PipelineStage>("ready_to_approach");
   const [showArchived, setShowArchived] = useState(false);
   const [pendingClose, setPendingClose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
+  const [pendingLose, setPendingLose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -203,6 +205,29 @@ export function PipelineBoard({
     }
   }
 
+  function handleLose(lead: LeadRow) {
+    setPendingLose({ lead, snapshot: leads });
+  }
+
+  async function handleLoseConfirm(reason: string) {
+    if (!pendingLose) return;
+    const { lead, snapshot } = pendingLose;
+    setPendingLose(null);
+    setLeads((prev) => prev.filter((l) => l.id !== lead.id)); // optimistic — off the board
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/lose`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error("fail");
+      toast.success(`${lead.name} marcado como perdido`);
+    } catch {
+      setLeads(snapshot);
+      toast.error("Erro ao marcar como perdido");
+    }
+  }
+
   const closedTotal = columns.closed.reduce((sum, l) => sum + (l.closed_value ?? 0), 0);
 
   return (
@@ -251,6 +276,7 @@ export function PipelineBoard({
                         whatsappMessage={messages[lead.id]}
                         onMoveTo={(s) => handleMoveTo(lead, s)}
                         onMeetingStatusChange={(status) => handleMeetingStatusChange(lead, status)}
+                        onLose={() => handleLose(lead)}
                       />
                     ))}
                   </SortableContext>
@@ -266,6 +292,7 @@ export function PipelineBoard({
                 regionName={regionMap[activeLead.region_id]}
                 onMoveTo={() => {}}
                 onMeetingStatusChange={() => {}}
+                onLose={() => {}}
               />
             ) : null}
           </DragOverlay>
@@ -274,6 +301,9 @@ export function PipelineBoard({
 
       {pendingClose && (
         <CloseDealDialog lead={pendingClose.lead} onCancel={handleCloseCancel} onConfirm={handleCloseConfirm} />
+      )}
+      {pendingLose && (
+        <LoseDealDialog lead={pendingLose.lead} onCancel={() => setPendingLose(null)} onConfirm={handleLoseConfirm} />
       )}
     </div>
   );
