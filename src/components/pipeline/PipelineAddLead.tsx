@@ -17,6 +17,9 @@ export function PipelineAddLead() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [adding, setAdding] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [igInput, setIgInput] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -59,6 +62,33 @@ export function PipelineAddLead() {
     router.refresh();
   }
 
+  // Create a brand-new prospect from a typed name (+ optional Instagram/phone) and add it.
+  async function createNew() {
+    const name = q.trim();
+    if (name.length < 2) {
+      toast.error("Digite um nome");
+      return;
+    }
+    setCreating(true);
+    const res = await fetch("/api/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, instagram: igInput.trim() || undefined, phone: phoneInput.trim() || undefined }),
+    });
+    setCreating(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? "Erro ao criar prospecto");
+      return;
+    }
+    toast.success(`${name} criado e adicionado ao pipeline`);
+    setQ("");
+    setIgInput("");
+    setPhoneInput("");
+    setOpen(false);
+    router.refresh();
+  }
+
   return (
     <>
       <Button size="sm" onClick={() => setOpen(true)}>
@@ -80,28 +110,52 @@ export function PipelineAddLead() {
                 ref={inputRef}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar lead para adicionar ao pipeline…"
+                placeholder="Buscar um lead ou digitar um nome novo…"
                 className="h-12 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted"
               />
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="text-muted hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="max-h-[50vh] overflow-y-auto">
-              {q.trim().length >= 2 && results.length === 0 && (
-                <p className="px-4 py-6 text-center text-sm text-muted">Nenhum lead disponível.</p>
-              )}
+            <div className="max-h-[45vh] overflow-y-auto">
               {results.map((r) => (
                 <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-surface-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium text-foreground">{r.name}</div>
                     <div className="truncate text-xs text-muted">{categoryLabel(r.category)}</div>
                   </div>
-                  <Button size="sm" loading={adding === r.id} onClick={() => add(r)}>
+                  <Button size="sm" variant="outline" loading={adding === r.id} onClick={() => add(r)}>
                     <Plus className="h-3.5 w-3.5" /> Adicionar
                   </Button>
                 </div>
               ))}
+            </div>
+
+            {/* Create a new prospect from any name — for leads you have (an Instagram link, a
+                referral) that aren't in the CRM yet. */}
+            <div className="border-t border-border bg-surface-2/40 p-4">
+              <p className="mb-2 text-xs text-muted">
+                Não está na lista? Crie um novo prospecto{q.trim() ? ` "${q.trim()}"` : ""}:
+              </p>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    value={igInput}
+                    onChange={(e) => setIgInput(e.target.value)}
+                    placeholder="Instagram (link ou @, opcional)"
+                    className="h-9 flex-1 rounded-md border border-border bg-surface px-2 text-sm text-foreground outline-none focus:border-accent"
+                  />
+                  <input
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="Telefone (opcional)"
+                    className="h-9 w-40 rounded-md border border-border bg-surface px-2 text-sm text-foreground outline-none focus:border-accent"
+                  />
+                </div>
+                <Button size="sm" loading={creating} disabled={q.trim().length < 2} onClick={createNew}>
+                  <Plus className="h-3.5 w-3.5" /> Criar e adicionar ao pipeline
+                </Button>
+              </div>
             </div>
           </div>
         </div>
