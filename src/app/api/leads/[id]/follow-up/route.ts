@@ -13,9 +13,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const admin = createAdminClient();
+  const followUpAt = parsed.data.next_follow_up_at;
   const { error } = await admin
     .from("leads")
-    .update({ next_follow_up_at: parsed.data.next_follow_up_at, last_activity_at: new Date().toISOString() })
+    .update({
+      next_follow_up_at: followUpAt,
+      next_action_type: followUpAt ? "follow_up" : null,
+      next_action_at: followUpAt,
+      last_activity_at: new Date().toISOString(),
+    })
     .eq("id", leadId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

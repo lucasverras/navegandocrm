@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CADENCE_STEP_DAYS } from "@/types/domain";
 
 // Advance the follow-up cadence one step (D+2 → D+5 → D+10 → +10 thereafter) and schedule the
 // next follow-up. Never sends a message — it just creates the next demand. A reply cancels the
 // cadence (reset via the response route). Base is "no reply after contact".
-const STEP_DAYS = [2, 5, 10];
 
 export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -17,7 +17,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
   if (!leadRaw) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   const step = (leadRaw as { cadence_step: number }).cadence_step ?? 0;
 
-  const days = STEP_DAYS[Math.min(step, STEP_DAYS.length - 1)];
+  const days = CADENCE_STEP_DAYS[Math.min(step, CADENCE_STEP_DAYS.length - 1)];
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(9, 0, 0, 0);
@@ -25,7 +25,13 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
 
   const { error } = await admin
     .from("leads")
-    .update({ next_follow_up_at: d.toISOString(), cadence_step: step + 1, last_activity_at: now })
+    .update({
+      next_follow_up_at: d.toISOString(),
+      next_action_type: "follow_up",
+      next_action_at: d.toISOString(),
+      cadence_step: step + 1,
+      last_activity_at: now,
+    })
     .eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -181,6 +181,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .select()
       .single();
     await admin.from("leads").update({ commercial_status: "message_ready" }).eq("id", leadId);
+    // A ready message creates the (undated) "primeira abordagem" demand — unless the lead
+    // already has a scheduled next action (never clobber a follow-up/meeting).
+    await admin.from("leads").update({ next_action_type: "first_approach" }).eq("id", leadId).is("next_action_type", null);
     return NextResponse.json({ message });
   }
 
@@ -385,6 +388,8 @@ Responda apenas com o texto da mensagem, sem aspas, sem comentários.`;
     .single();
 
   await admin.from("leads").update({ commercial_status: "message_ready" }).eq("id", leadId);
+  // Undated "primeira abordagem" demand — unless a next action is already scheduled.
+  await admin.from("leads").update({ next_action_type: "first_approach" }).eq("id", leadId).is("next_action_type", null);
 
   await logApiUsage({
     service: "openai",

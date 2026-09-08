@@ -21,10 +21,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: cur } = await admin.from("leads").select("pipeline_stage").eq("id", id).maybeSingle();
   const stage = (cur as { pipeline_stage: string | null } | null)?.pipeline_stage;
 
+  // Default demand after sending a proposal: chase it in 3 days at 09:00.
+  const chase = new Date();
+  chase.setDate(chase.getDate() + 3);
+  chase.setHours(9, 0, 0, 0);
+
   const update: Record<string, unknown> = {
     proposal_value: parsed.data.value ?? null,
     proposal_note: parsed.data.note ?? null,
     proposal_sent_at: now,
+    next_action_type: "chase_proposal",
+    next_action_at: chase.toISOString(),
+    next_follow_up_at: chase.toISOString(),
     cadence_step: 0,
     last_activity_at: now,
   };

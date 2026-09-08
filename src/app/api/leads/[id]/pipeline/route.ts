@@ -16,8 +16,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const admin = createAdminClient();
 
-  const { data: currentRaw } = await admin.from("leads").select("pipeline_stage").eq("id", leadId).maybeSingle();
-  const current = currentRaw as unknown as { pipeline_stage: string } | null;
+  const { data: currentRaw } = await admin
+    .from("leads")
+    .select("pipeline_stage, next_action_type")
+    .eq("id", leadId)
+    .maybeSingle();
+  const current = currentRaw as unknown as { pipeline_stage: string | null; next_action_type: string | null } | null;
   if (!current) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
 
   const now = new Date().toISOString();
@@ -31,6 +35,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (stageChanged) {
     update.previous_stage = current.pipeline_stage;
     update.stage_changed_at = now;
+  }
+  // Entering the board without a pending action → the demand is the first approach.
+  if (!current.pipeline_stage && !current.next_action_type) {
+    update.next_action_type = "first_approach";
   }
 
   const { error } = await admin.from("leads").update(update).eq("id", leadId);

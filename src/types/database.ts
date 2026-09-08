@@ -84,12 +84,19 @@ export interface LeadRow {
   stage_changed_at: string;
   assigned_to: string | null;
   next_follow_up_at: string | null;
+  cadence_step: number;
+  next_action_type: string | null;
+  next_action_at: string | null;
   last_activity_at: string;
   first_contacted_at: string | null;
   last_contacted_at: string | null;
   meeting_at: string | null;
   meeting_status: "scheduled" | "held" | "proposal_pending" | "proposal_sent" | "negotiation" | null;
+  meeting_link: string | null;
+  meeting_note: string | null;
   proposal_sent_at: string | null;
+  proposal_value: number | null;
+  proposal_note: string | null;
   closed_at: string | null;
   closed_service: string | null;
   closed_value: number | null;
@@ -126,6 +133,7 @@ export interface LeadRow {
   instagram_confirmed: boolean;
   instagram_confirmation_method: "manual" | "ai_search" | "website_url" | "website_html" | null;
   instagram_checked_at: string | null;
+  photo_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -231,6 +239,7 @@ export interface OutreachMessageRow {
   estimated_cost_usd: number;
   edited: boolean;
   refined: boolean;
+  rationale: Json | null;
   created_at: string;
 }
 

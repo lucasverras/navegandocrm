@@ -38,6 +38,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       commission_type: parsed.data.commission_type ?? "one_time_percentage",
       commission_percent: parsed.data.commission_percent ?? null,
       churned_at: null,
+      // Deal done — no pending demands.
+      next_action_type: null,
+      next_action_at: null,
+      next_follow_up_at: null,
       last_activity_at: now,
     })
     .eq("id", leadId);

@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
     row.business_status = "client";
   } else {
     row.pipeline_stage = d.stage ?? FIRST_PIPELINE_STAGE;
+    // A fresh lead on the board: its demand is the (undated) first approach.
+    row.next_action_type = "first_approach";
   }
 
   const { data, error } = await admin.from("leads").insert(row).select("id, name").single();

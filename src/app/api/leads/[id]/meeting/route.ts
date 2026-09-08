@@ -28,6 +28,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     meeting_note: parsed.data.note ?? null,
     meeting_status: "scheduled",
     commercial_status: "meeting_scheduled",
+    next_action_type: "meeting",
+    next_action_at: parsed.data.meeting_at,
     cadence_step: 0,
     last_activity_at: now,
   };

@@ -23,7 +23,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.data.reactivate) {
     const { error } = await admin
       .from("leads")
-      .update({ lost_reason: null, archived_at: null, pipeline_stage: "ready_to_approach", stage_changed_at: now, last_activity_at: now })
+      .update({
+        lost_reason: null,
+        archived_at: null,
+        pipeline_stage: "ready_to_approach",
+        stage_changed_at: now,
+        next_action_type: "first_approach",
+        next_action_at: null,
+        last_activity_at: now,
+      })
       .eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await admin.from("outreach_events").insert({ lead_id: id, event_type: "reactivated", channel: "system", metadata: { by: user.id } });
@@ -32,7 +40,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { error } = await admin
     .from("leads")
-    .update({ lost_reason: parsed.data.reason ?? "Outro", archived_at: now, last_activity_at: now })
+    .update({
+      lost_reason: parsed.data.reason ?? "Outro",
+      archived_at: now,
+      next_action_type: null,
+      next_action_at: null,
+      next_follow_up_at: null,
+      last_activity_at: now,
+    })
     .eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await admin.from("outreach_events").insert({

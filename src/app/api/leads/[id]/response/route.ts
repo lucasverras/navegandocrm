@@ -61,6 +61,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (rule.commercial) update.commercial_status = rule.commercial;
   if (rule.lost) update.business_status = "not_interested";
   if (rule.followUpDays !== undefined) update.next_follow_up_at = rule.followUpDays == null ? null : daysFromNowIso(rule.followUpDays);
+
+  // Next action ("qual é o próximo passo?") — kept in sync with every registered outcome.
+  if (kind === "reuniao") {
+    update.next_action_type = "meeting";
+    update.next_action_at = null; // until the meeting time is captured
+  } else if (kind === "contato_errado") {
+    update.next_action_type = "call_decisor";
+    update.next_action_at = null;
+  } else if (rule.lost) {
+    update.next_action_type = null;
+    update.next_action_at = null;
+  } else if (rule.followUpDays != null) {
+    update.next_action_type = "follow_up";
+    update.next_action_at = update.next_follow_up_at;
+  }
   // Only advance the board when the lead is on it and not already closed.
   if (rule.advanceTo && stage && stage !== "closed") {
     update.pipeline_stage = rule.advanceTo;

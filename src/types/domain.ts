@@ -152,6 +152,36 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
 // The first stage a lead lands on when consciously added to the pipeline.
 export const FIRST_PIPELINE_STAGE: PipelineStage = "ready_to_approach";
 
+// Follow-up cadence (Odoo activity-plan pattern, manual send): D+2 → D+5 → D+10.
+// The system creates demands; it never sends messages automatically.
+export const CADENCE_STEP_DAYS = [2, 5, 10] as const;
+
+// Next action — every active commercial lead answers "qual é o próximo passo?"
+// (SuiteCRM "Next Step" + Odoo activity). Hoje is built entirely from these.
+export const NEXT_ACTION_TYPES = [
+  "first_approach",
+  "follow_up",
+  "respond",
+  "call_decisor",
+  "meeting",
+  "chase_proposal",
+] as const;
+export type NextActionType = (typeof NEXT_ACTION_TYPES)[number];
+
+export const NEXT_ACTION_LABELS: Record<NextActionType, string> = {
+  first_approach: "Primeira abordagem",
+  follow_up: "Follow-up",
+  respond: "Responder",
+  call_decisor: "Chamar decisor",
+  meeting: "Reunião",
+  chase_proposal: "Cobrar proposta",
+};
+
+export function nextActionLabel(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  return NEXT_ACTION_LABELS[raw as NextActionType] ?? raw.replace(/_/g, " ");
+}
+
 export const MEETING_STATUSES = ["scheduled", "held", "proposal_pending", "proposal_sent", "negotiation"] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];
 
