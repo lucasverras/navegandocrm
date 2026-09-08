@@ -19,7 +19,24 @@ actually shipped vs. what remains, honestly.
   prepare chaining, dashboard cockpit + compacted events, mobile action bar, Configurações
   (AI limits + global blocklist), reclassification of legacy junk data.
 
+## Shipped (loop 2 — sales daily-driver)
+- **Trabalhar Fila**: prioritized one-demand-at-a-time full-screen queue on Hoje (follow-up
+  atrasado → reunião → follow-up hoje → pronto), WhatsApp pre-filled + resultado buttons that
+  register and advance; "Fila concluída" end state.
+- **Global "+ Novo lead"** in the sidebar (nome/WhatsApp/Instagram/região/origem/etapa).
+- **Perdidos**: "Perder" on pipeline card (hover) → reason dialog; optimistic off-board; archived
+  view shows reason + "Reativar". Endpoint `/api/leads/[id]/lose` (lose + reactivate).
+- **Analytics tab** in Resultados: funil de conversão, fechados por região, motivos de perda,
+  MRR acumulado (recharts lazy-loaded).
+- **Histórico** rebuilt as a human, day-grouped timeline (translated events, collapses repeats).
+
 ## Not done yet (honest remainder of the V5 brief)
+- Cadência automática D+2/D+5/D+10 (auto demand chain; the "sem resposta" in the fila sets +2 today).
+- Reunião (data/hora/Meet) + Proposta (valor/obs/data) structured capture as first-class actions.
+- Pipeline card Trello-minimal trim + field-narrowed query + virtualization (perf).
+- Prospecção first level organized BY region with per-region funnel counts.
+- Full component-level visual polish to Attio/Linear level — needs screenshot verification.
+- Mobile pipeline single-column; Todas as demandas tabs; duplicate detection on manual create.
 - Full component-level visual rebuild to Attio/Linear polish (only the token flip + targeted
   component work so far — needs a real visual pass with screenshots).
 - "Trabalhar Fila" one-demand-at-a-time full-screen queue + "Todas as demandas" tabs.
