@@ -37,7 +37,7 @@ function LoginForm() {
     }
 
     toast.success("Bem-vindo de volta");
-    const redirectTo = searchParams.get("redirect") || "/dashboard";
+    const redirectTo = searchParams.get("redirect") || "/hoje";
     router.push(redirectTo);
     router.refresh();
   }

@@ -110,7 +110,10 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
                 <p className="text-sm text-muted">Você trabalhou todas as {total} demandas. Bom trabalho.</p>
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    setOpen(false);
+                    router.push("/hoje?f=todas");
+                  }}
                   className="mt-2 rounded-md border border-border px-4 py-2 text-sm text-foreground hover:border-accent"
                 >
                   Ver todas as demandas

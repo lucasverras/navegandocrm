@@ -16,14 +16,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect("/login");
 
   const nowIso = new Date().toISOString();
-  const [{ count: overdueCount }, { count: readyCount }, { count: pendingReviewCount }, { data: regionsRaw }] = await Promise.all([
+  const [{ count: overdueCount }, { count: pendingReviewCount }, { data: regionsRaw }] = await Promise.all([
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
-      .lt("next_follow_up_at", nowIso)
-      .neq("pipeline_stage", "closed")
+      .lt("next_action_at", nowIso)
+      .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
       .is("archived_at", null),
-    supabase.from("leads").select("id", { count: "exact", head: true }).eq("commercial_status", "message_ready"),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "pending_review"),
     supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }),
   ]);
@@ -54,11 +53,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <SearchTrigger className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted transition-colors hover:text-foreground" />
         </div>
         <NavLinks items={navItems} />
-        {!!readyCount && (
-          <p className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-muted">
-            {readyCount} mensagem(ns) prontas aguardando envio
-          </p>
-        )}
         <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
           <p className="truncate px-2 text-xs text-muted">{user.email}</p>
           <LogoutButton />
