@@ -12,6 +12,7 @@ import { LeadsFilters } from "@/components/leads/LeadsFilters";
 import { BulkActionsBar } from "@/components/leads/BulkActionsBar";
 import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
 import { LeadPreviewTrigger } from "@/components/leads/LeadDrawer";
+import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
 import { daysFromNow } from "@/lib/utils";
 import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type { LeadWithRegion } from "@/app/(dashboard)/leads/page";
@@ -221,13 +222,14 @@ export function LeadsExplorer({
                   <Td>
                     <div className="flex items-center gap-1">
                       <LeadPreviewTrigger leadId={lead.id} />
+                      {!lead.pipeline_stage && <AddToPipelineButton leadId={lead.id} compact />}
                       <LeadQuickActions lead={lead} />
                       <button
                         type="button"
                         onClick={() => handleDiscardOne(lead.id, lead.name)}
                         title="Descartar lead"
                         aria-label="Descartar lead"
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-hover hover:text-danger"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface-2 text-muted transition-all hover:bg-surface-hover hover:text-danger active:scale-90"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

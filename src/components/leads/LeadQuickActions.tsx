@@ -52,8 +52,9 @@ export function LeadQuickActions({
   const guard = stopNavigation ? { "data-no-navigate": "" } : {};
   const stop = stopNavigation ? (e: React.MouseEvent) => e.stopPropagation() : undefined;
 
+  // Resting surface + active press so the icons read as real, tappable buttons (affordance).
   const base =
-    "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-hover";
+    "inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface-2 text-muted transition-all hover:bg-surface-hover active:scale-90";
 
   return (
     <div className={cn("flex items-center gap-0.5", className)} {...guard}>

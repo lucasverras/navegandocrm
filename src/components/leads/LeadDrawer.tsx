@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Eye, X } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
+import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
 import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { categoryLabel, PIPELINE_STAGE_LABELS } from "@/types/domain";
 
@@ -109,11 +110,12 @@ export function LeadDrawer() {
 
         {lead && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <LeadQuickActions lead={lead} />
               {lead.phone && data?.latestMessage && (
                 <WhatsAppButton phone={lead.phone} message={data.latestMessage.content} />
               )}
+              {!lead.pipeline_stage && <AddToPipelineButton leadId={lead.id} />}
             </div>
 
             <div className="flex flex-wrap gap-2 text-xs">
@@ -179,7 +181,7 @@ export function LeadPreviewTrigger({ leadId, className }: { leadId: string; clas
       }}
       title="Pré-visualizar"
       aria-label="Pré-visualizar lead"
-      className={className ?? "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-surface-hover hover:text-foreground"}
+      className={className ?? "inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface-2 text-muted transition-all hover:bg-surface-hover hover:text-foreground active:scale-90"}
     >
       <Eye className="h-4 w-4" />
     </button>

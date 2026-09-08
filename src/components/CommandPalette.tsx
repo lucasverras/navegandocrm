@@ -131,8 +131,8 @@ export function CommandPalette() {
               <div
                 key={r.id}
                 onMouseEnter={() => setActive(i)}
-                className={`flex items-center justify-between gap-3 px-4 py-2.5 ${
-                  i === active ? "bg-surface-2" : ""
+                className={`flex items-center justify-between gap-3 border-l-2 px-4 py-2.5 transition-colors ${
+                  i === active ? "border-accent bg-accent-soft" : "border-transparent"
                 }`}
               >
                 <button type="button" onClick={() => openLead(r)} className="flex min-w-0 flex-1 flex-col text-left">

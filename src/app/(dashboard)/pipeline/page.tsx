@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
@@ -36,6 +37,19 @@ export default async function PipelinePage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeading eyebrow="Funil comercial" title="Pipeline" />
+      {typedLeads.length === 0 && (
+        <p className="text-sm text-muted">
+          Nenhum lead no pipeline ainda. Adicione a partir de{" "}
+          <Link href="/leads" className="text-accent-2 hover:underline">
+            Leads
+          </Link>{" "}
+          ou de{" "}
+          <Link href="/prospeccao?tab=prontos" className="text-accent-2 hover:underline">
+            Prospecção › Prontos
+          </Link>
+          .
+        </p>
+      )}
       <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} />
     </div>
   );
