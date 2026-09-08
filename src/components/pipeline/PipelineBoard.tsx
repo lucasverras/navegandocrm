@@ -161,6 +161,27 @@ export function PipelineBoard({
     await moveLead(lead.id, stage, destIndex);
   }
 
+  async function handleFollowUp(lead: LeadRow, days: number) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    d.setHours(9, 0, 0, 0);
+    const iso = d.toISOString();
+    const snapshot = leads;
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, next_follow_up_at: iso } : l)));
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/follow-up`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ next_follow_up_at: iso }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(days === 1 ? `${lead.name}: follow-up amanhã` : `${lead.name}: follow-up em ${days} dias`);
+    } catch {
+      setLeads(snapshot);
+      toast.error("Erro ao agendar follow-up");
+    }
+  }
+
   async function handleMeetingStatusChange(lead: LeadRow, status: MeetingStatus) {
     const snapshot = leads;
     setLeads((prev) => prev.map((l) => (l.id === lead.id ? { ...l, meeting_status: status } : l)));
@@ -289,6 +310,7 @@ export function PipelineBoard({
                         onMoveTo={(s) => handleMoveTo(lead, s)}
                         onMeetingStatusChange={(status) => handleMeetingStatusChange(lead, status)}
                         onLose={() => handleLose(lead)}
+                        onFollowUp={(days) => handleFollowUp(lead, days)}
                       />
                     ))}
                   </SortableContext>

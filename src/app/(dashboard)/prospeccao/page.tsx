@@ -6,6 +6,7 @@ import { SelectionQueue } from "@/components/discovery/SelectionQueue";
 import { PrepareQueue } from "@/components/discovery/PrepareQueue";
 import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
 import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
+import { LeadDrawerLink } from "@/components/leads/LeadDrawer";
 import { categoryLabel } from "@/types/domain";
 import { Inbox, CheckCircle2, ChevronRight, MapPin } from "lucide-react";
 
@@ -283,9 +284,9 @@ async function ProntosTab({ regionId, nullRegion }: { regionId?: string; nullReg
           <div key={lead.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-2">
-                <Link href={`/leads/${lead.id}`} className="font-semibold text-foreground hover:text-accent-2">
+                <LeadDrawerLink leadId={lead.id} className="text-left font-semibold text-foreground transition-colors hover:text-accent-2">
                   {lead.name}
-                </Link>
+                </LeadDrawerLink>
                 <span className="text-xs text-muted">{categoryLabel(lead.category)}</span>
               </div>
               <p className="mt-0.5 text-xs text-muted">

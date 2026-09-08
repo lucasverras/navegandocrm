@@ -16,21 +16,28 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [{ data: lead }, { data: dm }, { data: msg }, { data: analysis }] = await Promise.all([
+  const [{ data: lead }, { data: dm }, { data: msg }, { data: analysis }, { data: events }] = await Promise.all([
     admin
       .from("leads")
       .select(
-        "id, name, category, phone, website, instagram, instagram_handle, instagram_url, maps_url, google_rating, google_review_count, ai_score, pre_score, pipeline_stage, commercial_status, next_follow_up_at, regions(neighborhood, city)"
+        "id, name, category, phone, website, instagram, instagram_handle, instagram_url, maps_url, google_rating, google_review_count, ai_score, pre_score, pipeline_stage, commercial_status, notes, next_follow_up_at, next_action_type, next_action_at, meeting_at, meeting_link, meeting_note, proposal_value, proposal_note, proposal_sent_at, regions(neighborhood, city)"
       )
       .eq("id", id)
       .maybeSingle(),
     admin.from("decision_makers").select("name, role, confidence").eq("lead_id", id).eq("found", true).order("researched_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("outreach_messages").select("content, variant").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("lead_analysis").select("main_opportunity, opportunity_focus").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("outreach_events").select("id, event_type, metadata, created_at").eq("lead_id", id).order("created_at", { ascending: false }).limit(10),
   ]);
 
   if (!lead) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
-  return NextResponse.json({ lead, decisionMaker: dm ?? null, latestMessage: msg ?? null, analysis: analysis ?? null });
+  return NextResponse.json({
+    lead,
+    decisionMaker: dm ?? null,
+    latestMessage: msg ?? null,
+    analysis: analysis ?? null,
+    events: events ?? [],
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { MessageCircle, Video } from "lucide-react";
+import { LeadDrawerLink } from "@/components/leads/LeadDrawer";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { BRL } from "@/lib/finance";
 import { actionLine, demandHandle, demandInstagramUrl, type Demand } from "./demand";
@@ -22,9 +22,7 @@ export function DemandRow({ demand, todayStart, message }: { demand: Demand; tod
     <li className="flex items-center justify-between gap-3 border-b border-border/70 py-2 last:border-b-0">
       <div className="min-w-0">
         <div className="flex items-baseline gap-2">
-          <Link href={`/leads/${demand.id}`} className="truncate text-sm font-semibold text-foreground transition-colors hover:text-accent-2">
-            {demand.name}
-          </Link>
+          <LeadDrawerLink leadId={demand.id}>{demand.name}</LeadDrawerLink>
           {demand.next_action_type === "chase_proposal" && demand.proposal_value != null && (
             <span className="shrink-0 text-xs tabular-nums text-muted">{BRL.format(demand.proposal_value)}/mês</span>
           )}

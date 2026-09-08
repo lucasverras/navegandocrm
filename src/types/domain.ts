@@ -139,8 +139,8 @@ export const PIPELINE_STAGES = [
 export type PipelineStage = (typeof PIPELINE_STAGES)[number];
 
 export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
-  ready_to_approach: "Pronto para abordar",
-  first_contact: "Primeiro contato",
+  ready_to_approach: "A abordar",
+  first_contact: "Contato feito",
   reaching_dm: "Tentando decisor",
   talking_dm: "Falando com decisor",
   meeting: "Reunião",

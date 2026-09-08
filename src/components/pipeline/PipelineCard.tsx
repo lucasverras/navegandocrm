@@ -1,18 +1,26 @@
 "use client";
 
+import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useRouter } from "next/navigation";
 import { GripVertical, MessageCircle } from "lucide-react";
 import { instagramUrl } from "@/components/leads/LeadQuickActions";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { BRL } from "@/lib/finance";
 import { cn, formatHumanDate, daysFromNow } from "@/lib/utils";
 import type { LeadRow } from "@/types/database";
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, MEETING_STATUSES, MEETING_STATUS_LABELS } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
+const FOLLOW_UP_CHOICES = [
+  { days: 1, label: "Amanhã" },
+  { days: 2, label: "D+2" },
+  { days: 5, label: "D+5" },
+  { days: 10, label: "D+10" },
+];
+
 // Trello-minimal card: name, phone + WhatsApp, @handle + Instagram, and the next date. Nothing
-// else on the face — extra detail lives one click into the lead.
+// else on the face — extra detail lives one click into the lead (side drawer, §50).
 export function PipelineCard({
   lead,
   regionName,
@@ -20,6 +28,7 @@ export function PipelineCard({
   onMoveTo,
   onMeetingStatusChange,
   onLose,
+  onFollowUp,
 }: {
   lead: LeadRow;
   regionName: string | undefined;
@@ -27,8 +36,9 @@ export function PipelineCard({
   onMoveTo: (stage: PipelineStage) => void;
   onMeetingStatusChange: (status: MeetingStatus) => void;
   onLose: () => void;
+  onFollowUp?: (days: number) => void;
 }) {
-  const router = useRouter();
+  const [showFollowUp, setShowFollowUp] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: lead.id,
     data: { stage: lead.pipeline_stage },
@@ -37,6 +47,7 @@ export function PipelineCard({
 
   const followUpDays = daysFromNow(lead.next_follow_up_at);
   const overdue = followUpDays !== null && followUpDays < 0;
+  const dueToday = followUpDays === 0;
   const wa = lead.phone ? buildWhatsAppLink(lead.phone, whatsappMessage ?? "") : null;
   const ig = instagramUrl(lead);
   const handle = (lead.instagram_handle ?? lead.instagram ?? "").replace(/^@/, "");
@@ -44,7 +55,8 @@ export function PipelineCard({
   function handleCardClick(e: React.MouseEvent) {
     const target = e.target as HTMLElement;
     if (target.closest("[data-no-navigate]")) return;
-    router.push(`/leads/${lead.id}`);
+    // §50: click opens the side drawer — the board never navigates away.
+    window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId: lead.id } }));
   }
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
 
@@ -90,10 +102,14 @@ export function PipelineCard({
         </div>
       )}
 
+      {lead.proposal_value != null && lead.proposal_value > 0 && (
+        <div className="text-[12px] font-semibold tabular-nums text-foreground">{BRL.format(lead.proposal_value)}/mês</div>
+      )}
+
       {lead.meeting_at ? (
         <div className="text-[11px] text-accent-2">Reunião · {formatHumanDate(lead.meeting_at)}</div>
       ) : lead.next_follow_up_at ? (
-        <div className={cn("text-[11px]", overdue ? "text-danger" : "text-muted")}>
+        <div className={cn("text-[11px]", overdue ? "text-danger" : dueToday ? "text-warning" : "text-muted")}>
           {overdue ? "Follow-up atrasado" : "Follow-up"} · {formatHumanDate(lead.next_follow_up_at)}
         </div>
       ) : null}
@@ -117,7 +133,27 @@ export function PipelineCard({
         </select>
       )}
 
-      {/* Mobile stage mover (drag is desktop-first) + hover "Perder". */}
+      {/* Quick follow-up (§37): Amanhã / D+2 / D+5 / D+10 sem sair do board. */}
+      {showFollowUp && onFollowUp && (
+        <div data-no-navigate onPointerDown={stopDrag} className="flex flex-wrap gap-1">
+          {FOLLOW_UP_CHOICES.map((c) => (
+            <button
+              key={c.days}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFollowUp(false);
+                onFollowUp(c.days);
+              }}
+              className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-accent hover:text-accent-2"
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Mobile stage mover (drag is desktop-first) + hover actions. */}
       <div className="flex items-center justify-between gap-2">
         <select
           data-no-navigate
@@ -133,18 +169,34 @@ export function PipelineCard({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          data-no-navigate
-          onPointerDown={stopDrag}
-          onClick={(e) => {
-            e.stopPropagation();
-            onLose();
-          }}
-          className="ml-auto text-[11px] text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-        >
-          Perder
-        </button>
+        <div className="ml-auto flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          {onFollowUp && (
+            <button
+              type="button"
+              data-no-navigate
+              onPointerDown={stopDrag}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFollowUp((v) => !v);
+              }}
+              className="text-[11px] text-muted hover:text-accent-2"
+            >
+              Follow-up
+            </button>
+          )}
+          <button
+            type="button"
+            data-no-navigate
+            onPointerDown={stopDrag}
+            onClick={(e) => {
+              e.stopPropagation();
+              onLose();
+            }}
+            className="text-[11px] text-muted hover:text-danger"
+          >
+            Perder
+          </button>
+        </div>
       </div>
     </div>
   );

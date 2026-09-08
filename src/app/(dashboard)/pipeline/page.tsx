@@ -15,7 +15,7 @@ export default async function PipelinePage() {
       // rows have a null stage and must never appear on the board. Narrow columns — the Trello
       // card only needs these; full detail loads when the lead is opened.
       .select(
-        "id, name, phone, instagram, instagram_handle, instagram_url, pipeline_stage, pipeline_position, region_id, next_follow_up_at, meeting_at, meeting_status, closed_value"
+        "id, name, phone, instagram, instagram_handle, instagram_url, pipeline_stage, pipeline_position, region_id, next_follow_up_at, meeting_at, meeting_status, closed_value, proposal_value"
       )
       .is("archived_at", null)
       .not("pipeline_stage", "is", null)

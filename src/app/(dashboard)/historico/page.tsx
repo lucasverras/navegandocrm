@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { eventLabel } from "@/lib/event-labels";
 import { History } from "lucide-react";
 
 type EventRow = {
@@ -13,49 +13,6 @@ type EventRow = {
   metadata: Record<string, unknown> | null;
   leads?: { name?: string } | null;
 };
-
-const STAGE = PIPELINE_STAGE_LABELS as Record<string, string>;
-const RESPONSE_LABEL: Record<string, string> = {
-  respondeu: "respondeu", interessado: "demonstrou interesse", apresentacao: "pediu apresentação",
-  agencia: "já tem agência", depois: "chamar depois", reuniao: "topou reunião",
-  contato_errado: "contato errado", nao_interessado: "não teve interesse",
-};
-
-// Turns a raw event_type + metadata into one human sentence.
-function humanize(e: EventRow): string {
-  const m = e.metadata ?? {};
-  const t = e.event_type;
-  if (t === "triage_decision") {
-    const d = String((m as { decision?: string }).decision ?? "");
-    return d === "approved" ? "Selecionado na triagem" : d === "rejected" ? "Descartado na triagem" : d === "review_later" ? "Adiado na triagem" : "Triagem";
-  }
-  if (t === "stage_changed") {
-    const from = STAGE[String((m as { from?: string }).from ?? "")] ?? null;
-    const to = STAGE[String((m as { to?: string }).to ?? "")] ?? null;
-    return to ? `Movido para “${to}”${from ? ` (de ${from})` : ""}` : "Movido no pipeline";
-  }
-  if (t === "lost") return `Marcado como perdido — ${String((m as { reason?: string }).reason ?? "sem motivo")}`;
-  if (t.startsWith("response_")) return `Resposta registrada: ${RESPONSE_LABEL[t.replace("response_", "")] ?? t.replace("response_", "")}`;
-  if (t.startsWith("status_")) return `Status: ${t.replace("status_", "").replace(/_/g, " ")}`;
-  const STATIC: Record<string, string> = {
-    lead_discovered: "Lead encontrado",
-    instagram_found: "Instagram encontrado",
-    haiku_analysis: "Análise de IA gerada",
-    message_generated: "Mensagem gerada",
-    message_sent: "Mensagem enviada",
-    contacted: "Primeira abordagem",
-    closed_won: "Negócio fechado 🎉",
-    reactivated: "Reativado",
-    lead_created_manual: "Lead criado manualmente",
-    client_added_manual: "Cliente adicionado aos resultados",
-    preparation_status_changed: "Preparação atualizada",
-    decision_maker_search: "Pesquisa de decisor",
-    assigned: "Responsável atribuído",
-    follow_up_set: "Follow-up definido",
-    meeting_scheduled: "Reunião marcada",
-  };
-  return STATIC[t] ?? t.replace(/_/g, " ");
-}
 
 function dayLabel(iso: string): string {
   const d = new Date(iso);
@@ -113,7 +70,7 @@ export default async function HistoricoPage() {
                     ) : (
                       <span className="font-medium text-foreground">Sistema</span>
                     )}
-                    <span className="text-muted"> · {humanize(e)}</span>
+                    <span className="text-muted"> · {eventLabel(e.event_type, e.metadata)}</span>
                   </li>
                 ))}
               </ol>
