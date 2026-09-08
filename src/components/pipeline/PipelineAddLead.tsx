@@ -5,13 +5,23 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { categoryLabel, FIRST_PIPELINE_STAGE } from "@/types/domain";
+import { categoryLabel, FIRST_PIPELINE_STAGE, PIPELINE_STAGE_LABELS } from "@/types/domain";
+import type { PipelineStage } from "@/types/domain";
 
 type Result = { id: string; name: string; phone: string | null; category: string | null };
 
-// "+ Adicionar lead" on the Pipeline page — search an approved/triaged lead and drop it onto
-// the board (into "Pronto para abordar"). This is the conscious entry into the pipeline.
-export function PipelineAddLead() {
+// "+ Adicionar lead" — search an approved/triaged lead (or create a brand-new prospect) and drop
+// it onto the board. Used two ways: the primary button in the header (adds to the first stage) and
+// a quiet footer button under each column (adds straight into THAT stage — "adicionar especificamente").
+export function PipelineAddLead({
+  stage,
+  variant = "primary",
+}: {
+  stage?: PipelineStage;
+  variant?: "primary" | "footer";
+}) {
+  const targetStage = stage ?? FIRST_PIPELINE_STAGE;
+  const stageLabel = PIPELINE_STAGE_LABELS[targetStage];
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -50,14 +60,14 @@ export function PipelineAddLead() {
     const res = await fetch(`/api/leads/${r.id}/pipeline`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stage: FIRST_PIPELINE_STAGE, position: 0 }),
+      body: JSON.stringify({ stage: targetStage, position: 0 }),
     });
     setAdding(null);
     if (!res.ok) {
       toast.error("Erro ao adicionar");
       return;
     }
-    toast.success(`${r.name} adicionado ao pipeline`);
+    toast.success(`${r.name} → ${stageLabel}`);
     setResults((rs) => rs.filter((x) => x.id !== r.id));
     router.refresh();
   }
@@ -73,7 +83,7 @@ export function PipelineAddLead() {
     const res = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, instagram: igInput.trim() || undefined, phone: phoneInput.trim() || undefined }),
+      body: JSON.stringify({ name, stage: targetStage, instagram: igInput.trim() || undefined, phone: phoneInput.trim() || undefined }),
     });
     setCreating(false);
     if (!res.ok) {
@@ -81,7 +91,7 @@ export function PipelineAddLead() {
       toast.error(data.error ?? "Erro ao criar prospecto");
       return;
     }
-    toast.success(`${name} criado e adicionado ao pipeline`);
+    toast.success(`${name} criado → ${stageLabel}`);
     setQ("");
     setIgInput("");
     setPhoneInput("");
@@ -91,9 +101,19 @@ export function PipelineAddLead() {
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <Plus className="h-4 w-4" /> Adicionar lead
-      </Button>
+      {variant === "footer" ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center gap-1.5 rounded-md px-2 py-2 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+        >
+          <Plus className="h-3.5 w-3.5" /> Adicionar lead
+        </button>
+      ) : (
+        <Button size="sm" onClick={() => setOpen(true)}>
+          <Plus className="h-4 w-4" /> Adicionar lead
+        </Button>
+      )}
 
       {open && (
         <div
@@ -116,6 +136,9 @@ export function PipelineAddLead() {
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="text-muted hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
+            </div>
+            <div className="border-b border-border px-4 py-2 text-[11px] text-muted">
+              Adicionando em <span className="font-medium text-foreground">{stageLabel}</span>
             </div>
             <div className="max-h-[45vh] overflow-y-auto">
               {results.map((r) => (
@@ -153,7 +176,7 @@ export function PipelineAddLead() {
                   />
                 </div>
                 <Button size="sm" loading={creating} disabled={q.trim().length < 2} onClick={createNew}>
-                  <Plus className="h-3.5 w-3.5" /> Criar e adicionar ao pipeline
+                  <Plus className="h-3.5 w-3.5" /> Criar e adicionar
                 </Button>
               </div>
             </div>

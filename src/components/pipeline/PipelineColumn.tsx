@@ -15,12 +15,14 @@ export function PipelineColumn({
   leads,
   totalValue,
   children,
+  footer,
 }: {
   stage: PipelineStage;
   leads: LeadRow[];
   regionMap: Record<string, string>;
   totalValue?: number;
   children: ReactNode;
+  footer?: ReactNode;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `column-${stage}`, data: { stage } });
 
@@ -40,7 +42,8 @@ export function PipelineColumn({
       )}
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 pt-1">
         {children}
-        {leads.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted/70">Nenhum lead</p>}
+        {leads.length === 0 && !footer && <p className="px-1 py-4 text-center text-xs text-muted/70">Nenhum lead</p>}
+        {footer}
       </div>
     </div>
   );

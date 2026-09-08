@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { PipelineColumn } from "@/components/pipeline/PipelineColumn";
 import { PipelineCard } from "@/components/pipeline/PipelineCard";
+import { PipelineAddLead } from "@/components/pipeline/PipelineAddLead";
 import { CloseDealDialog } from "@/components/pipeline/CloseDealDialog";
 import { LoseDealDialog } from "@/components/pipeline/LoseDealDialog";
 import { ArchivedLeads } from "@/components/pipeline/ArchivedLeads";
@@ -57,6 +58,16 @@ export function PipelineBoard({
   const [showArchived, setShowArchived] = useState(false);
   const [pendingClose, setPendingClose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
   const [pendingLose, setPendingLose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
+
+  // Server data is the source of truth after a router.refresh() (e.g. a lead added via the
+  // per-column "Adicionar lead"). Drag/drop mutations never refresh, so this only fires when
+  // fresh data actually arrives — it won't clobber an in-flight optimistic move. Render-time
+  // reconciliation (not an effect) per React's "adjusting state when props change".
+  const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
+  if (prevInitialLeads !== initialLeads) {
+    setPrevInitialLeads(initialLeads);
+    setLeads(initialLeads);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -266,6 +277,7 @@ export function PipelineBoard({
                   leads={columns[stage]}
                   regionMap={regionMap}
                   totalValue={stage === "closed" ? closedTotal : undefined}
+                  footer={stage !== "closed" ? <PipelineAddLead stage={stage} variant="footer" /> : undefined}
                 >
                   <SortableContext items={columns[stage].map((l) => l.id)} strategy={verticalListSortingStrategy}>
                     {columns[stage].map((lead) => (

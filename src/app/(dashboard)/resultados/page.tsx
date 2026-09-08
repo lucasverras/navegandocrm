@@ -19,6 +19,7 @@ import {
   reimbursementTotals,
   type ClientFinance,
 } from "@/lib/finance";
+import { formatDate } from "@/lib/utils";
 import { Wallet } from "lucide-react";
 
 type Tab = "overview" | "fechados" | "comissoes" | "reembolsos" | "analytics";
@@ -109,6 +110,46 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
             <Mini label="Comissões pendentes" value={BRL.format(comPendente)} />
             <Mini label="Reembolsos pendentes" value={BRL.format(reembT.pending)} />
           </div>
+
+          {/* Clientes fechados — a quick list right on the overview, so the numbers above have
+              faces behind them. Full detail + edição fica na aba "Fechados". */}
+          {clients.length > 0 && (
+            <div className="border-t border-border pt-6">
+              <div className="mb-2 flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold text-foreground">Clientes fechados</h2>
+                {clients.length > 8 && (
+                  <Link href="/resultados?tab=fechados" className="text-xs text-muted transition-colors hover:text-foreground">
+                    Ver todos ({clients.length})
+                  </Link>
+                )}
+              </div>
+              <ul className="flex flex-col">
+                {clients.slice(0, 8).map((c) => {
+                  const active = isActive(c);
+                  const fee = c.current_monthly_fee ?? c.initial_monthly_fee ?? 0;
+                  return (
+                    <li key={c.id} className="flex items-center justify-between gap-4 border-b border-border/70 py-2.5 last:border-b-0">
+                      <div className="min-w-0">
+                        <Link href={`/leads/${c.id}`} className="text-sm font-medium text-foreground transition-colors hover:text-accent-2">
+                          {c.name}
+                        </Link>
+                        <p className="truncate text-xs text-muted">
+                          {c.region ?? "Sem região"} · desde {c.closed_at ? formatDate(c.closed_at) : "—"}
+                          {fee > 0 && ` · ${BRL.format(fee)}/mês`}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-5">
+                        <span className="tabular-nums text-sm font-semibold text-foreground">{BRL.format(receitaGerada(c, now))}</span>
+                        <span className={`w-16 text-right text-xs ${active ? "text-success" : "text-muted"}`}>
+                          {active ? "Ativo" : "Encerrado"}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
