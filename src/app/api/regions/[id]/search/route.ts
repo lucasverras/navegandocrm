@@ -144,6 +144,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         maps_url: place.mapsUrl,
         google_rating: place.rating,
         google_review_count: place.reviewCount,
+        photo_name: place.photoName,
         price_level: place.priceLevel,
         lat: place.lat,
         lng: place.lng,

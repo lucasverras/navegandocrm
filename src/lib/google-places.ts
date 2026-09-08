@@ -44,6 +44,8 @@ export interface PlaceResult {
   priceLevel: number | null;
   lat: number | null;
   lng: number | null;
+  /** Places photo resource name (places/{place}/photos/{photo}) — rendered via /api/places/photo. */
+  photoName: string | null;
 }
 
 const PRICE_LEVEL_MAP: Record<string, number> = {
@@ -80,7 +82,7 @@ export async function searchNearbyByCategory(
         "X-Goog-FieldMask":
           "places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber," +
           "places.websiteUri,places.googleMapsUri,places.rating,places.userRatingCount,places.priceLevel," +
-          "places.location,places.businessStatus,places.primaryType,places.types,nextPageToken",
+          "places.location,places.businessStatus,places.primaryType,places.types,places.photos,nextPageToken",
       },
       body: JSON.stringify(
         pageToken
@@ -121,6 +123,7 @@ export async function searchNearbyByCategory(
         priceLevel: p.priceLevel ? PRICE_LEVEL_MAP[p.priceLevel as string] ?? null : null,
         lat: location?.latitude ?? null,
         lng: location?.longitude ?? null,
+        photoName: (p.photos as { name?: string }[] | undefined)?.[0]?.name ?? null,
       });
     }
 

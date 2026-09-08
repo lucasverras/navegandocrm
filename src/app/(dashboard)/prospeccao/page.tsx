@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SelectionQueue } from "@/components/discovery/SelectionQueue";
 import { PrepareQueue } from "@/components/discovery/PrepareQueue";
 import { AddToPipelineButton } from "@/components/leads/AddToPipelineButton";
+import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { categoryLabel } from "@/types/domain";
 import { Inbox, CheckCircle2, ChevronRight, MapPin } from "lucide-react";
 
@@ -174,7 +175,7 @@ async function EncontradosTab({ regionId, nullRegion }: { regionId?: string; nul
     supabase
       .from("leads")
       .select(
-        "id, name, category, address, phone, website, google_rating, google_review_count, price_level, maps_url, pre_score, instagram, instagram_handle, instagram_url, discovery_campaign_id"
+        "id, name, category, address, phone, website, google_rating, google_review_count, price_level, maps_url, pre_score, instagram, instagram_handle, instagram_url, discovery_campaign_id, photo_name"
       )
       .eq("triage_status", "pending_review"),
     regionId,
@@ -182,7 +183,15 @@ async function EncontradosTab({ regionId, nullRegion }: { regionId?: string; nul
   )
     .order("pre_score", { ascending: false })
     .limit(200);
-  return <SelectionQueue leads={data ?? []} />;
+  return (
+    <div className="flex flex-col gap-3">
+      <SelectionQueue leads={data ?? []} />
+      {/* Alternativa de CONTROLE ao Tinder (§20): a tabela completa vive em /leads. */}
+      <Link href="/leads" className="w-fit text-xs text-muted transition-colors hover:text-foreground">
+        Ver em tabela →
+      </Link>
+    </div>
+  );
 }
 
 async function SelecionadosTab({ regionId, nullRegion }: { regionId?: string; nullRegion?: boolean }) {
@@ -215,41 +224,94 @@ async function SelecionadosTab({ regionId, nullRegion }: { regionId?: string; nu
   return <PrepareQueue leads={enriched} />;
 }
 
+// Prontos (§25): o lead está pronto para ser chamado — telefone, Instagram, decisor, uma
+// observação específica e a mensagem pronta, com WhatsApp a um clique.
 async function ProntosTab({ regionId, nullRegion }: { regionId?: string; nullRegion?: boolean }) {
   const supabase = await createClient();
   const { data } = await applyScope(
-    supabase.from("leads").select("id, name, category, ai_score, pre_score").eq("preparation_status", "ready").is("pipeline_stage", null),
+    supabase
+      .from("leads")
+      .select("id, name, category, phone, instagram, instagram_handle, instagram_url, ai_score")
+      .eq("preparation_status", "ready")
+      .is("pipeline_stage", null),
     regionId,
     nullRegion
   )
     .order("ai_score", { ascending: false, nullsFirst: false })
     .limit(100);
-  const leads = data ?? [];
+  const leads = (data ?? []) as {
+    id: string;
+    name: string;
+    category: string;
+    phone: string | null;
+    instagram: string | null;
+    instagram_handle: string | null;
+    instagram_url: string | null;
+    ai_score: number | null;
+  }[];
 
   if (!leads.length) {
     return <EmptyState icon={<Inbox className="h-8 w-8" />} title="Nenhum lead pronto" description="Prepare leads em Selecionados para vê-los aqui, prontos para o pipeline." />;
   }
 
+  const ids = leads.map((l) => l.id);
+  const [{ data: dmsRaw }, { data: msgsRaw }, { data: analysesRaw }] = await Promise.all([
+    supabase.from("decision_makers").select("lead_id, name, role").eq("found", true).in("lead_id", ids),
+    supabase.from("outreach_messages").select("lead_id, content, created_at").in("lead_id", ids).order("created_at", { ascending: false }),
+    supabase.from("lead_analysis").select("lead_id, main_opportunity, created_at").in("lead_id", ids).order("created_at", { ascending: false }),
+  ]);
+  const decisorBy = new Map<string, string>();
+  for (const d of (dmsRaw ?? []) as { lead_id: string; name: string | null; role: string | null }[]) {
+    if (!decisorBy.has(d.lead_id) && d.name) decisorBy.set(d.lead_id, [d.name, d.role].filter(Boolean).join(" · "));
+  }
+  const messageBy = new Map<string, string>();
+  for (const m of (msgsRaw ?? []) as { lead_id: string; content: string }[]) {
+    if (!messageBy.has(m.lead_id)) messageBy.set(m.lead_id, m.content);
+  }
+  const obsBy = new Map<string, string>();
+  for (const a of (analysesRaw ?? []) as { lead_id: string; main_opportunity: string | null }[]) {
+    if (!obsBy.has(a.lead_id) && a.main_opportunity) obsBy.set(a.lead_id, a.main_opportunity);
+  }
+
   return (
-    <div className="flex flex-col gap-2">
-      {leads.map((lead) => (
-        <div key={lead.id} className="flex items-center justify-between rounded-lg border border-border bg-surface-2 px-4 py-3">
-          <div>
-            <Link href={`/leads/${lead.id}`} className="font-medium text-foreground hover:text-accent-2">
-              {lead.name}
-            </Link>
-            <div className="text-xs text-muted">
-              {categoryLabel(lead.category)} · score {lead.ai_score ?? lead.pre_score}
+    <div className="flex flex-col divide-y divide-border/70">
+      {leads.map((lead) => {
+        const handle = (lead.instagram_handle ?? lead.instagram)?.replace(/^@/, "");
+        const igUrl = lead.instagram_url ?? (handle ? `https://instagram.com/${handle}` : null);
+        const obs = obsBy.get(lead.id);
+        return (
+          <div key={lead.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <Link href={`/leads/${lead.id}`} className="font-semibold text-foreground hover:text-accent-2">
+                  {lead.name}
+                </Link>
+                <span className="text-xs text-muted">{categoryLabel(lead.category)}</span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                {lead.phone && <span className="tabular-nums">{lead.phone}</span>}
+                {handle && igUrl && (
+                  <>
+                    {lead.phone && " · "}
+                    <a href={igUrl} target="_blank" rel="noreferrer" className="text-accent-2 hover:underline">
+                      @{handle}
+                    </a>
+                  </>
+                )}
+                {decisorBy.get(lead.id) && <span> · {decisorBy.get(lead.id)}</span>}
+              </p>
+              {obs && <p className="mt-0.5 line-clamp-1 text-xs text-muted">{obs}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <WhatsAppButton phone={lead.phone} message={messageBy.get(lead.id) ?? ""} />
+              <AddToPipelineButton leadId={lead.id} />
+              <Link href={`/leads/${lead.id}`} className="text-xs text-accent-2 hover:underline">
+                Abrir
+              </Link>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <AddToPipelineButton leadId={lead.id} />
-            <Link href={`/leads/${lead.id}`} className="text-xs text-accent-2 hover:underline">
-              Abrir
-            </Link>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

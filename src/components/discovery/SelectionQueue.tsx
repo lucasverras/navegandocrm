@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Card, CardContent } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { LeadQuickActions } from "@/components/leads/LeadQuickActions";
+import { LeadQuickActions, instagramUrl } from "@/components/leads/LeadQuickActions";
 import { useHotkeys } from "@/hooks/use-hotkeys";
-import { getPreScoreBucket, PRE_SCORE_BUCKET_LABELS } from "@/lib/prescore";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { categoryLabel } from "@/types/domain";
-import { CheckCircle2, XCircle, Clock, Inbox, Undo2 } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Inbox, Undo2, Star } from "lucide-react";
 import type { LeadRow } from "@/types/database";
 
 type QueueLead = Pick<
@@ -30,12 +30,13 @@ type QueueLead = Pick<
   | "instagram_handle"
   | "instagram_url"
   | "discovery_campaign_id"
+  | "photo_name"
 >;
 
 type Decision = "approved" | "rejected" | "review_later";
 
 const DECISION_LABEL: Record<Decision, string> = {
-  approved: "aprovado",
+  approved: "selecionado",
   rejected: "descartado",
   review_later: "adiado",
 };
@@ -52,26 +53,63 @@ const REJECT_REASONS: { code: string; label: string }[] = [
 ];
 
 function priceLabel(level: number | null): string | null {
-  if (level == null) return null;
-  if (level <= 0) return null;
+  if (level == null || level <= 0) return null;
   return "$".repeat(Math.min(4, level));
 }
 
+// O Tinder do Radar (V6 §20-23): decisão em 2-4 segundos, um restaurante por vez.
+// Selecionar salva, avança na hora e dispara a preparação em background — nunca bloqueia.
 export function SelectionQueue({ leads }: { leads: QueueLead[] }) {
-  // Fully local, optimistic queue — decisions never trigger a server refetch. `total` and
-  // `done` drive the progress counter; `history` powers undo (the whole card comes back).
+  const router = useRouter();
   const [queue, setQueue] = useState(leads);
   const [index, setIndex] = useState(0);
   const [done, setDone] = useState(0);
   const total = leads.length;
   const [submitting, setSubmitting] = useState(false);
   const [history, setHistory] = useState<{ lead: QueueLead; at: number; decision: Decision }[]>([]);
+  // Background preparations run one at a time (AI rate limits) without ever blocking triage.
+  const prepChain = useRef<Promise<void>>(Promise.resolve());
 
   async function patchTriage(id: string, decision: Decision | "pending_review", reason?: string) {
     return fetch(`/api/leads/${id}/triage`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision, ...(reason ? { rejection_reason: reason } : {}) }),
+    });
+  }
+
+  // Selecionar → preparar sem burocracia (§23): Instagram → análise → decisor → mensagem,
+  // tudo em background, com um toast no final. Falha vira "parcial", nunca um bloqueio.
+  function queueBackgroundPrep(lead: QueueLead) {
+    prepChain.current = prepChain.current.then(async () => {
+      try {
+        await fetch(`/api/leads/${lead.id}/instagram`, { method: "POST" }).catch(() => null);
+        const aRes = await fetch("/api/analysis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadIds: [lead.id] }),
+        });
+        await fetch(`/api/leads/${lead.id}/decision-maker`, { method: "POST" }).catch(() => null);
+        const mRes = await fetch(`/api/leads/${lead.id}/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const ready = aRes.ok && mRes.ok;
+        await fetch(`/api/leads/${lead.id}/prepare`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: ready ? "mark_ready" : "mark_partial",
+            next_best_action: ready ? "Revisar mensagem e abordar" : "Completar manualmente",
+          }),
+        });
+        if (ready) toast.success(`${lead.name} preparado — pronto para abordar`);
+        else toast.warning(`${lead.name}: preparação parcial — finalize em Selecionados`);
+        router.refresh();
+      } catch {
+        toast.warning(`${lead.name}: preparação falhou — finalize em Selecionados`);
+      }
     });
   }
 
@@ -114,6 +152,10 @@ export function SelectionQueue({ leads }: { leads: QueueLead[] }) {
 
     setHistory((h) => [...h, { lead: current, at, decision }]);
 
+    if (decision === "approved") {
+      queueBackgroundPrep(current);
+    }
+
     // Learning suggestion: discarding a chain offers to block chains for the whole campaign.
     // Never auto-applies — always a confirmed, one-click action (§ nunca aplicar regra sem confirmação).
     if (decision === "rejected" && reason === "rede" && current.discovery_campaign_id) {
@@ -148,19 +190,28 @@ export function SelectionQueue({ leads }: { leads: QueueLead[] }) {
     if (!res.ok) toast.error("Não foi possível desfazer");
   }
 
+  const lead = queue.length ? queue[Math.min(index, queue.length - 1)] : null;
+
+  function openExternal(url: string | null | undefined) {
+    if (url) window.open(url, "_blank", "noopener");
+  }
+
   useHotkeys(
     {
       a: () => decide("approved"),
+      ArrowRight: () => decide("approved"),
       x: () => decide("rejected"),
+      ArrowLeft: () => decide("rejected"),
       d: () => decide("review_later"),
-      arrowright: () => setIndex((i) => Math.min(i + 1, queue.length - 1)),
-      arrowleft: () => setIndex((i) => Math.max(i - 1, 0)),
       u: () => undo(),
+      i: () => openExternal(lead ? instagramUrl(lead) : null),
+      w: () => openExternal(lead?.phone ? buildWhatsAppLink(lead.phone, "") : null),
+      g: () => openExternal(lead?.maps_url),
     },
     [queue, index, submitting, history]
   );
 
-  if (!queue.length) {
+  if (!lead) {
     return (
       <div className="flex flex-col gap-4">
         {history.length > 0 && (
@@ -181,8 +232,6 @@ export function SelectionQueue({ leads }: { leads: QueueLead[] }) {
     );
   }
 
-  const lead = queue[Math.min(index, queue.length - 1)];
-  const bucket = getPreScoreBucket(lead.pre_score);
   const price = priceLabel(lead.price_level);
 
   return (
@@ -193,50 +242,45 @@ export function SelectionQueue({ leads }: { leads: QueueLead[] }) {
           {" · "}
           {queue.length} na fila
         </span>
-        <span className="hidden sm:block">
-          <kbd>A</kbd> aprovar · <kbd>X</kbd> descartar · <kbd>D</kbd> depois · <kbd>U</kbd> desfazer ·{" "}
-          <kbd>←</kbd>/<kbd>→</kbd>
+        <span className="hidden sm:block text-xs">
+          <kbd>A</kbd>/<kbd>→</kbd> selecionar · <kbd>X</kbd>/<kbd>←</kbd> descartar · <kbd>D</kbd> depois · <kbd>U</kbd> desfazer ·{" "}
+          <kbd>I</kbd> instagram · <kbd>W</kbd> whatsapp · <kbd>G</kbd> maps
         </span>
       </div>
 
-      <Card>
+      <Card className="max-w-2xl overflow-hidden">
+        {lead.photo_name && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/places/photo?name=${encodeURIComponent(lead.photo_name)}`}
+            alt={lead.name}
+            loading="lazy"
+            className="h-56 w-full bg-surface-2 object-cover"
+          />
+        )}
         <CardContent className="flex flex-col gap-3 p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="font-display text-2xl font-bold text-foreground">{lead.name}</h2>
-              <p className="text-sm text-muted">{categoryLabel(lead.category)}</p>
-            </div>
-            <Badge tone={bucket === "strong" || bucket === "exceptional" ? "success" : bucket === "weak" ? "muted" : "warning"}>
-              Pré {lead.pre_score} · {PRE_SCORE_BUCKET_LABELS[bucket]}
-            </Badge>
+          <div>
+            <h2 className="font-display text-2xl font-bold text-foreground">{lead.name}</h2>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+              <span>{categoryLabel(lead.category)}</span>
+              {lead.google_rating != null && (
+                <span className="inline-flex items-center gap-1 text-foreground">
+                  <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+                  {lead.google_rating}
+                  {lead.google_review_count != null && <span className="text-muted">({lead.google_review_count})</span>}
+                </span>
+              )}
+              {price && <span>{price}</span>}
+              {lead.phone && <span className="tabular-nums">{lead.phone}</span>}
+            </p>
+            {lead.address && <p className="mt-1 text-xs text-muted">{lead.address}</p>}
           </div>
-
-          <div className="grid grid-cols-2 gap-3 text-sm text-foreground sm:grid-cols-4">
-            <div>
-              <div className="text-xs text-muted">Nota</div>
-              <div>{lead.google_rating ?? "—"}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted">Avaliações</div>
-              <div>{lead.google_review_count ?? "—"}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted">Preço</div>
-              <div>{price ?? "—"}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted">Telefone</div>
-              <div>{lead.phone ?? "—"}</div>
-            </div>
-          </div>
-
-          <p className="text-sm text-muted">{lead.address}</p>
 
           <LeadQuickActions lead={lead} className="pt-1" />
 
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-2">
             <Button onClick={() => decide("approved")} disabled={submitting}>
-              <CheckCircle2 className="h-4 w-4" /> Aprovar
+              <CheckCircle2 className="h-4 w-4" /> Selecionar
             </Button>
             <Button variant="danger" onClick={() => decide("rejected")} disabled={submitting}>
               <XCircle className="h-4 w-4" /> Descartar
