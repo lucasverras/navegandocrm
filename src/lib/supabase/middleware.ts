@@ -36,18 +36,22 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
+  // getSession() is local (reads the JWT from the cookie without a network round-trip to
+  // Supabase Auth). The layout already calls getUser() for a verified check — the middleware
+  // only needs to know "is there a session at all?" to gate the redirect, and doing a second
+  // getUser() here was adding 100-300ms of latency to EVERY navigation.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (!user && !isPublic) {
+  if (!session && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", path);
     return NextResponse.redirect(url);
   }
 
-  if (user && path === "/login") {
+  if (session && path === "/login") {
     const url = request.nextUrl.clone();
     url.pathname = "/hoje";
     url.searchParams.delete("redirect");

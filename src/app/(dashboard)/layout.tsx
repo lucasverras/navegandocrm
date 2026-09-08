@@ -15,6 +15,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!user) redirect("/login");
 
+  // Only fetch what the nav shell strictly needs: badge counts + a capped region list for
+  // the "Novo lead" dialog. These run in parallel and are head/count queries (no row data).
   const nowIso = new Date().toISOString();
   const [{ count: overdueCount }, { count: pendingReviewCount }, { data: regionsRaw }] = await Promise.all([
     supabase
@@ -24,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
       .is("archived_at", null),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "pending_review"),
-    supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }),
+    supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }).limit(100),
   ]);
   const regions = (regionsRaw ?? []) as { id: string; neighborhood: string; city: string }[];
 
