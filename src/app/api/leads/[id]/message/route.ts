@@ -13,6 +13,7 @@ import {
 } from "@/lib/openai";
 import { checkUsageLimit, logApiUsage } from "@/lib/cost-control";
 import { pickRelevantCase, describeCase } from "@/lib/cases";
+import { looksGeneric, REGENERATE_HINT } from "@/lib/message-quality";
 import { categoryLabel } from "@/types/domain";
 import type { MessageVariant } from "@/types/domain";
 import type { LeadRow, DecisionMakerRow, LeadAnalysisRow, RegionRow } from "@/types/database";
@@ -320,34 +321,51 @@ ${context}`,
     ? " Esta é uma versão refinada: capriche mais na naturalidade e na precisão da observação específica."
     : "";
 
-  let response;
-  try {
-    response = await client.responses.create({
-      model,
-      instructions: AGENCY_CONTEXT,
-      max_output_tokens: 700,
-      ...(isReasoningModel(model) ? { reasoning: { effort: "low" as const } } : {}),
-      input: `${VOICE_RULES}
+  const buildInput = (extra: string) => `${VOICE_RULES}
 
-Escreva UMA mensagem seguindo: saudação curta → observação específica → o que a Navegando faz (1 frase concreta) → uma pergunta simples.${refineNote} ${variantInstruction(variant)}
+Escreva UMA mensagem seguindo: saudação curta → observação específica → o que a Navegando faz (1 frase concreta) → uma pergunta simples.${refineNote} ${variantInstruction(variant)}${extra}
 
 Contexto:
 ${context}
 
-Responda apenas com o texto da mensagem, sem aspas, sem comentários.`,
+Responda apenas com o texto da mensagem, sem aspas, sem comentários.`;
+
+  async function generateOnce(extra: string) {
+    return client.responses.create({
+      model,
+      instructions: AGENCY_CONTEXT,
+      max_output_tokens: 700,
+      ...(isReasoningModel(model) ? { reasoning: { effort: "low" as const } } : {}),
+      input: buildInput(extra),
     });
+  }
+
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let content = "";
+  try {
+    const first = await generateOnce("");
+    content = extractOutputText(first).trim();
+    inputTokens += first.usage?.input_tokens ?? 0;
+    outputTokens += first.usage?.output_tokens ?? 0;
+
+    // "20 restaurantes" validator: if the first attempt reads generic, regenerate ONCE.
+    if (content && looksGeneric(content)) {
+      const retry = await generateOnce(REGENERATE_HINT);
+      const retryContent = extractOutputText(retry).trim();
+      inputTokens += retry.usage?.input_tokens ?? 0;
+      outputTokens += retry.usage?.output_tokens ?? 0;
+      if (retryContent) content = retryContent;
+    }
   } catch (err) {
     const { status, message } = describeOpenAIError(err);
     return NextResponse.json({ error: message }, { status });
   }
 
-  const content = extractOutputText(response).trim();
   if (!content) {
     return NextResponse.json({ error: "A IA não retornou nenhum texto de mensagem." }, { status: 502 });
   }
 
-  const inputTokens = response.usage?.input_tokens ?? 0;
-  const outputTokens = response.usage?.output_tokens ?? 0;
   const cost = estimateCostUSD(model, inputTokens, outputTokens);
 
   const { data: message } = await admin
