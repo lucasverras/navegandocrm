@@ -21,14 +21,14 @@ export default async function PipelinePage() {
       .not("pipeline_stage", "is", null)
       .order("pipeline_stage", { ascending: true })
       .order("pipeline_position", { ascending: true })
-      .limit(500),
+      .limit(200),
     supabase
       .from("leads")
       .select("id, name, category, region_id, lost_reason, archived_at")
       .not("archived_at", "is", null)
       .order("updated_at", { ascending: false })
-      .limit(200),
-    supabase.from("regions").select("id, neighborhood"),
+      .limit(100),
+    supabase.from("regions").select("id, neighborhood").limit(100),
   ]);
 
   const typedLeads = (leads as unknown as LeadRow[] | null) ?? [];
@@ -38,15 +38,17 @@ export default async function PipelinePage() {
   const regionMap: Record<string, string> = {};
   for (const r of typedRegions) regionMap[r.id] = r.neighborhood;
 
-  // Latest prepared message per board lead, so "Entrar em contato" opens WhatsApp pre-filled.
+  // Latest prepared message per board lead (only those with a phone — no point pre-filling WA
+  // for leads without one). Capped at 200 rows to avoid unbounded result sets.
   const messages: Record<string, string> = {};
-  const boardIds = typedLeads.map((l) => l.id);
-  if (boardIds.length) {
+  const boardIdsWithPhone = typedLeads.filter((l) => l.phone).map((l) => l.id);
+  if (boardIdsWithPhone.length) {
     const { data: msgs } = await supabase
       .from("outreach_messages")
       .select("lead_id, content, created_at")
-      .in("lead_id", boardIds)
-      .order("created_at", { ascending: false });
+      .in("lead_id", boardIdsWithPhone)
+      .order("created_at", { ascending: false })
+      .limit(200);
     for (const m of (msgs ?? []) as { lead_id: string; content: string }[]) {
       if (!messages[m.lead_id]) messages[m.lead_id] = m.content;
     }

@@ -39,9 +39,9 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   const supabase = await createClient();
 
   const [{ data: clientsRaw }, { data: reimbsRaw }, { data: regionsRaw }] = await Promise.all([
-    supabase.from("leads").select(FIELDS).eq("pipeline_stage", "closed").order("closed_at", { ascending: false, nullsFirst: false }),
-    supabase.from("reimbursements").select("id, description, amount, amount_received, status, spent_at").order("created_at", { ascending: false }),
-    supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }),
+    supabase.from("leads").select(FIELDS).eq("pipeline_stage", "closed").order("closed_at", { ascending: false, nullsFirst: false }).limit(100),
+    supabase.from("reimbursements").select("id, description, amount, amount_received, status, spent_at").order("created_at", { ascending: false }).limit(100),
+    supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }).limit(100),
   ]);
 
   const clients = ((clientsRaw ?? []) as unknown as ClientRow[]).map((c) => ({ ...c, region: c.regions?.neighborhood ?? null }));
