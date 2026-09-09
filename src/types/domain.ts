@@ -156,6 +156,32 @@ export const FIRST_PIPELINE_STAGE: PipelineStage = "ready_to_approach";
 // The system creates demands; it never sends messages automatically.
 export const CADENCE_STEP_DAYS = [2, 5, 10] as const;
 
+// Contact rounds (V7 §22-25): the outreach lifecycle is round-based, not calendar-based.
+// A lead enters FIRST_CONTACT when ready for approach; each "sem resposta" advances to the
+// next follow-up round. A reply exits the lead from rounds entirely.
+export const CONTACT_ROUNDS = ["FIRST_CONTACT", "FOLLOW_UP_1", "FOLLOW_UP_2", "FOLLOW_UP_3"] as const;
+export type ContactRound = (typeof CONTACT_ROUNDS)[number];
+
+export const CONTACT_ROUND_LABELS: Record<ContactRound, string> = {
+  FIRST_CONTACT: "Primeira abordagem",
+  FOLLOW_UP_1: "Follow-up 1",
+  FOLLOW_UP_2: "Follow-up 2",
+  FOLLOW_UP_3: "Follow-up 3",
+};
+
+export const CONTACT_ROUND_SHORT: Record<ContactRound, string> = {
+  FIRST_CONTACT: "1ª abordagem",
+  FOLLOW_UP_1: "FUP 1",
+  FOLLOW_UP_2: "FUP 2",
+  FOLLOW_UP_3: "FUP 3",
+};
+
+export function nextRound(current: ContactRound | null): ContactRound | null {
+  if (!current) return "FIRST_CONTACT";
+  const idx = CONTACT_ROUNDS.indexOf(current);
+  return idx < CONTACT_ROUNDS.length - 1 ? CONTACT_ROUNDS[idx + 1] : null;
+}
+
 // Next action — every active commercial lead answers "qual é o próximo passo?"
 // (SuiteCRM "Next Step" + Odoo activity). Hoje is built entirely from these.
 export const NEXT_ACTION_TYPES = [

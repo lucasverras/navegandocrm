@@ -36,9 +36,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     update.previous_stage = current.pipeline_stage;
     update.stage_changed_at = now;
   }
-  // Entering the board without a pending action → the demand is the first approach.
   if (!current.pipeline_stage && !current.next_action_type) {
     update.next_action_type = "first_approach";
+    update.contact_round = "FIRST_CONTACT";
   }
 
   const { error } = await admin.from("leads").update(update).eq("id", leadId);

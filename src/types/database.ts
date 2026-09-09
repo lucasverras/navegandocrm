@@ -87,6 +87,7 @@ export interface LeadRow {
   cadence_step: number;
   next_action_type: string | null;
   next_action_at: string | null;
+  contact_round: "FIRST_CONTACT" | "FOLLOW_UP_1" | "FOLLOW_UP_2" | "FOLLOW_UP_3" | null;
   last_activity_at: string;
   first_contacted_at: string | null;
   last_contacted_at: string | null;
@@ -292,6 +293,19 @@ export interface SettingsRow {
   updated_at: string;
 }
 
+export interface ChecklistRow {
+  id: string;
+  user_id: string;
+  text: string;
+  lead_id: string | null;
+  amount: number | null;
+  due_at: string | null;
+  type: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProfileRow {
   id: string;
   email: string;
@@ -322,6 +336,7 @@ export interface Database {
       campaign_leads: TableDef<CampaignLeadRow>;
       api_usage: TableDef<ApiUsageRow>;
       settings: TableDef<SettingsRow>;
+      checklists: TableDef<ChecklistRow>;
       profiles: TableDef<ProfileRow>;
     };
     Views: {

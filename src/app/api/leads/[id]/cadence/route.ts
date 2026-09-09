@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CADENCE_STEP_DAYS } from "@/types/domain";
+import { CADENCE_STEP_DAYS, CONTACT_ROUNDS, type ContactRound } from "@/types/domain";
 
 // Advance the follow-up cadence one step (D+2 → D+5 → D+10 → +10 thereafter) and schedule the
 // next follow-up. Never sends a message — it just creates the next demand. A reply cancels the
@@ -13,15 +13,25 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
   const { id } = await params;
 
   const admin = createAdminClient();
-  const { data: leadRaw } = await admin.from("leads").select("cadence_step").eq("id", id).maybeSingle();
+  const { data: leadRaw } = await admin
+    .from("leads")
+    .select("cadence_step, contact_round")
+    .eq("id", id)
+    .maybeSingle();
   if (!leadRaw) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
-  const step = (leadRaw as { cadence_step: number }).cadence_step ?? 0;
+  const { cadence_step: rawStep, contact_round: currentRound } =
+    leadRaw as { cadence_step: number; contact_round: ContactRound | null };
+  const step = rawStep ?? 0;
 
   const days = CADENCE_STEP_DAYS[Math.min(step, CADENCE_STEP_DAYS.length - 1)];
   const d = new Date();
   d.setDate(d.getDate() + days);
   d.setHours(9, 0, 0, 0);
   const now = new Date().toISOString();
+
+  // Advance contact round: FIRST_CONTACT → FUP_1 → FUP_2 → FUP_3 (stays at 3).
+  const roundIdx = currentRound ? CONTACT_ROUNDS.indexOf(currentRound) : -1;
+  const nextRound = CONTACT_ROUNDS[Math.min(roundIdx + 1, CONTACT_ROUNDS.length - 1)] ?? "FOLLOW_UP_1";
 
   const { error } = await admin
     .from("leads")
@@ -30,6 +40,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
       next_action_type: "follow_up",
       next_action_at: d.toISOString(),
       cadence_step: step + 1,
+      contact_round: nextRound,
       last_activity_at: now,
     })
     .eq("id", id);
