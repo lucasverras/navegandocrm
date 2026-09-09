@@ -48,7 +48,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex h-8 w-8 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent-2">
             <Compass className="h-4 w-4" />
           </div>
-          <span className="font-display text-sm font-extrabold uppercase tracking-wide">Radar Navegando</span>
+          <span className="font-display text-sm font-bold uppercase tracking-wide">Radar Navegando</span>
         </div>
         <div className="mb-3 flex flex-col gap-2">
           <NewLeadDialog regions={regions} />
@@ -66,7 +66,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="flex h-7 w-7 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent-2">
             <Compass className="h-3.5 w-3.5" />
           </div>
-          <span className="font-display text-sm font-extrabold uppercase tracking-wide">Radar Navegando</span>
+          <span className="font-display text-sm font-bold uppercase tracking-wide">Radar Navegando</span>
         </div>
         <LogoutButton />
       </div>

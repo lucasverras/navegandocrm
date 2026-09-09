@@ -1,7 +1,6 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, Plus, Trash2 } from "lucide-react";
 
@@ -26,7 +25,6 @@ export function ChecklistPanel({
   initialPending: Item[];
   initialDone: Item[];
 }) {
-  const router = useRouter();
   const [, startTransition] = useTransition();
   const [newText, setNewText] = useState("");
   const [pending, addOptimistic] = useOptimistic(initialPending, (state, action: { type: "add"; item: Item } | { type: "remove"; id: string }) => {
@@ -63,7 +61,7 @@ export function ChecklistPanel({
         body: JSON.stringify({ text }),
       }).catch(() => null);
       if (!res?.ok) toast.error("Erro ao criar item");
-      router.refresh();
+      // Optimistic UI already updated — no router.refresh() needed.
     });
   }
 
@@ -96,12 +94,12 @@ export function ChecklistPanel({
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ completed: false }),
-              }).then(() => router.refresh());
+              });
             },
           },
         });
       }
-      router.refresh();
+      // Optimistic UI already updated — no router.refresh() needed.
     });
   }
 
@@ -109,7 +107,7 @@ export function ChecklistPanel({
     startTransition(async () => {
       addDoneOptimistic({ type: "remove", id });
       await fetch(`/api/checklists/${id}`, { method: "DELETE" }).catch(() => null);
-      router.refresh();
+      // Optimistic UI already updated — no router.refresh() needed.
     });
   }
 

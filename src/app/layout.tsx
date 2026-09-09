@@ -8,12 +8,14 @@ import "./globals.css";
 const jakarta = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  weight: ["400", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

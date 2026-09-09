@@ -64,7 +64,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-display text-2xl font-extrabold tracking-tight">{lead.name}</h1>
+              <h1 className="font-display text-2xl font-bold tracking-tight">{lead.name}</h1>
               {lead.is_demo && <Badge tone="warning">DEMO</Badge>}
               {followUpOverdue && <Badge tone="danger">Follow-up atrasado</Badge>}
             </div>

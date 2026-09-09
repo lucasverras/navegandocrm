@@ -40,7 +40,7 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
     }).catch(() => null);
     setBusy(false);
     next();
-    router.refresh();
+    // No refresh while the fullscreen modal is open — the index already advanced.
   }
 
   async function cadence() {
@@ -51,7 +51,7 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
     setBusy(false);
     toast.success(data?.days ? `Follow-up em ${data.days} dias (cadência)` : "Follow-up agendado");
     next();
-    router.refresh();
+    // No refresh while the fullscreen modal is open — the index already advanced.
   }
 
   async function followUp(days: number, label: string) {
@@ -68,7 +68,7 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
     setBusy(false);
     toast.success(label);
     next();
-    router.refresh();
+    // No refresh while the fullscreen modal is open — the index already advanced.
   }
 
   if (total === 0) {
@@ -123,7 +123,7 @@ export function TrabalharFila({ demands }: { demands: FilaDemand[] }) {
               <div className="mt-[4vh] flex w-full max-w-md flex-col gap-5">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-accent-2">{current.reason}</p>
-                  <h2 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-foreground">{current.name}</h2>
+                  <h2 className="mt-1 font-display text-3xl font-bold tracking-tight text-foreground">{current.name}</h2>
                   {(current.decisor || current.region) && (
                     <p className="mt-1 text-sm text-muted">{[current.decisor, current.region].filter(Boolean).join(" · ")}</p>
                   )}

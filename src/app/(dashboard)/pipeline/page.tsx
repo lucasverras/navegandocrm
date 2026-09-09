@@ -8,12 +8,11 @@ import type { LeadRow, RegionRow } from "@/types/database";
 export default async function PipelinePage() {
   const supabase = await createClient();
 
-  const [{ data: leads }, { data: archived }, { data: regions }] = await Promise.all([
+  // ALL queries in parallel — zero waterfall. Messages are fetched globally (latest 200) and
+  // mapped client-side by lead_id, avoiding the sequential dependency on the leads query.
+  const [{ data: leads }, { data: archived }, { data: regions }, { data: msgsRaw }] = await Promise.all([
     supabase
       .from("leads")
-      // Only leads consciously added to the pipeline (pipeline_stage set). Raw discovery/triage
-      // rows have a null stage and must never appear on the board. Narrow columns — the Trello
-      // card only needs these; full detail loads when the lead is opened.
       .select(
         "id, name, phone, instagram, instagram_handle, instagram_url, pipeline_stage, pipeline_position, region_id, next_follow_up_at, meeting_at, meeting_status, closed_value, proposal_value, contact_round"
       )
@@ -29,6 +28,11 @@ export default async function PipelinePage() {
       .order("updated_at", { ascending: false })
       .limit(100),
     supabase.from("regions").select("id, neighborhood").limit(100),
+    supabase
+      .from("outreach_messages")
+      .select("lead_id, content, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   const typedLeads = (leads as unknown as LeadRow[] | null) ?? [];
@@ -38,20 +42,10 @@ export default async function PipelinePage() {
   const regionMap: Record<string, string> = {};
   for (const r of typedRegions) regionMap[r.id] = r.neighborhood;
 
-  // Latest prepared message per board lead (only those with a phone — no point pre-filling WA
-  // for leads without one). Capped at 200 rows to avoid unbounded result sets.
   const messages: Record<string, string> = {};
-  const boardIdsWithPhone = typedLeads.filter((l) => l.phone).map((l) => l.id);
-  if (boardIdsWithPhone.length) {
-    const { data: msgs } = await supabase
-      .from("outreach_messages")
-      .select("lead_id, content, created_at")
-      .in("lead_id", boardIdsWithPhone)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    for (const m of (msgs ?? []) as { lead_id: string; content: string }[]) {
-      if (!messages[m.lead_id]) messages[m.lead_id] = m.content;
-    }
+  const boardIdSet = new Set(typedLeads.filter((l) => l.phone).map((l) => l.id));
+  for (const m of (msgsRaw ?? []) as { lead_id: string; content: string }[]) {
+    if (boardIdSet.has(m.lead_id) && !messages[m.lead_id]) messages[m.lead_id] = m.content;
   }
 
   return (

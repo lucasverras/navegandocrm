@@ -38,15 +38,16 @@ export default async function HojePage() {
   const now = new Date();
   const todayStart = spTodayStart(now);
 
-  // All queries in parallel — single round-trip batch.
+  // ALL queries in parallel — zero sequential waterfalls. The messages query runs for all
+  // leads with next_action (broader than the fila subset) so it can join the first batch.
   const [
     { data: demandsRaw },
     { data: roundsRaw },
     { data: checkPending },
     { data: checkDone },
     { data: reimbRaw },
+    { data: messagesRaw },
   ] = await Promise.all([
-    // Demandas específicas (com data: reunião, cobrar proposta, chamar dia X).
     supabase
       .from("leads")
       .select(DEMAND_SELECT)
@@ -56,14 +57,13 @@ export default async function HojePage() {
       .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
       .order("next_action_at", { ascending: true, nullsFirst: false })
       .limit(200),
-    // Rodadas: leads agrupados por contact_round.
     supabase
       .from("leads")
       .select("id, contact_round")
       .is("archived_at", null)
       .not("contact_round", "is", null)
-      .or("pipeline_stage.is.null,pipeline_stage.neq.closed"),
-    // Checklists.
+      .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
+      .limit(200),
     supabase
       .from("checklists")
       .select("id, text, lead_id, amount, due_at, type, completed_at, created_at, leads(name)")
@@ -76,11 +76,17 @@ export default async function HojePage() {
       .not("completed_at", "is", null)
       .order("completed_at", { ascending: false })
       .limit(20),
-    // Reembolsos pendentes.
     supabase
       .from("reimbursements")
       .select("id, description, amount, amount_received, status")
-      .eq("status", "pending"),
+      .eq("status", "pending")
+      .limit(50),
+    // Pre-fetch messages for all demand leads (eliminates the sequential waterfall).
+    supabase
+      .from("outreach_messages")
+      .select("lead_id, content, created_at")
+      .order("created_at", { ascending: false })
+      .limit(300),
   ]);
 
   const demands = (demandsRaw ?? []) as unknown as Demand[];
@@ -101,19 +107,11 @@ export default async function HojePage() {
   }
   const totalRounds = Object.values(roundCounts).reduce((a, b) => a + b, 0);
 
-  // Fila de trabalho: atrasadas → hoje → primeira abordagem (sem data).
+  // Build message map from the pre-fetched messages (already sorted by created_at desc).
   const filaDemands = [...buckets.atrasadas, ...buckets.hoje];
   const latestMessageByLead = new Map<string, string>();
-  if (filaDemands.length > 0) {
-    const { data: messages } = await supabase
-      .from("outreach_messages")
-      .select("lead_id, content, created_at")
-      .in("lead_id", filaDemands.map((d) => d.id))
-      .order("created_at", { ascending: false })
-      .limit(200);
-    for (const msg of (messages ?? []) as Pick<OutreachMessageRow, "lead_id" | "content" | "created_at">[]) {
-      if (!latestMessageByLead.has(msg.lead_id)) latestMessageByLead.set(msg.lead_id, msg.content);
-    }
+  for (const msg of (messagesRaw ?? []) as Pick<OutreachMessageRow, "lead_id" | "content" | "created_at">[]) {
+    if (!latestMessageByLead.has(msg.lead_id)) latestMessageByLead.set(msg.lead_id, msg.content);
   }
 
   const fila: FilaDemand[] = filaDemands.map((d) => ({
@@ -144,7 +142,7 @@ export default async function HojePage() {
       {/* Greeting */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-tight text-foreground">
+          <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-foreground">
             {greeting()}, Lucas
           </h1>
           <p className="mt-0.5 text-sm capitalize text-muted">{DATE_FMT.format(now)}</p>

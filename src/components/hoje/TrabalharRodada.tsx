@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MessageCircle, X, Check, MapPin, Copy } from "lucide-react";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
@@ -20,7 +19,6 @@ type RoundLead = QuickActionLead & {
 // "Trabalhar rodada" (V7 §26-30): fullscreen one-at-a-time mode for a specific contact round.
 // The SDR works through FIRST_CONTACT, FUP_1, FUP_2 or FUP_3 without navigating the CRM.
 export function TrabalharRodada({ round }: { round: ContactRound }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [leads, setLeads] = useState<RoundLead[]>([]);
   const [index, setIndex] = useState(0);
@@ -68,7 +66,7 @@ export function TrabalharRodada({ round }: { round: ContactRound }) {
     }).catch(() => null);
     setBusy(false);
     next();
-    router.refresh();
+    // No refresh while the fullscreen modal is open — the index already advanced.
   }
 
   async function cadence() {
@@ -79,7 +77,7 @@ export function TrabalharRodada({ round }: { round: ContactRound }) {
     setBusy(false);
     toast.success(data?.days ? `Próxima rodada em ${data.days} dias` : "Avançado");
     next();
-    router.refresh();
+    // No refresh while the fullscreen modal is open — the index already advanced.
   }
 
   async function copyMessage() {
@@ -148,7 +146,7 @@ export function TrabalharRodada({ round }: { round: ContactRound }) {
               <div className="mt-[4vh] flex w-full max-w-md flex-col gap-5">
                 {/* Lead header */}
                 <div>
-                  <h2 className="font-display text-3xl font-extrabold tracking-tight text-foreground">{current.name}</h2>
+                  <h2 className="font-display text-3xl font-bold tracking-tight text-foreground">{current.name}</h2>
                   <p className="mt-1 text-sm text-muted">
                     {[current.decisor, current.regionName].filter(Boolean).join(" · ") || "—"}
                   </p>
