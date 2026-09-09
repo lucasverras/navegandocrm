@@ -13,8 +13,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { data: current, error: currentError } = await admin
+    .from("leads")
+    .select("first_contacted_at")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (currentError) return NextResponse.json({ error: currentError.message }, { status: 500 });
+  if (!current) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
 
-  const { error } = await admin.from("leads").update({ commercial_status: parsed.data.status }).eq("id", leadId);
+  const contactFields = parsed.data.status === "message_sent"
+    ? {
+        first_contacted_at: current.first_contacted_at ?? now,
+        last_contacted_at: now,
+        last_activity_at: now,
+      }
+    : { last_activity_at: now };
+  const { error } = await admin
+    .from("leads")
+    .update({ commercial_status: parsed.data.status, ...contactFields })
+    .eq("id", leadId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await admin.from("outreach_events").insert({

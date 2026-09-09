@@ -59,7 +59,7 @@ export default async function HojePage() {
       .limit(200),
     supabase
       .from("leads")
-      .select("id, contact_round")
+      .select("id, contact_round, next_action_at")
       .is("archived_at", null)
       .not("contact_round", "is", null)
       .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
@@ -79,7 +79,7 @@ export default async function HojePage() {
     supabase
       .from("reimbursements")
       .select("id, description, amount, amount_received, status")
-      .eq("status", "pending")
+      .eq("status", "pendente")
       .limit(50),
     // Pre-fetch messages for all demand leads (eliminates the sequential waterfall).
     supabase
@@ -90,7 +90,7 @@ export default async function HojePage() {
   ]);
 
   const demands = (demandsRaw ?? []) as unknown as Demand[];
-  const rounds = (roundsRaw ?? []) as { id: string; contact_round: ContactRound }[];
+  const rounds = (roundsRaw ?? []) as { id: string; contact_round: ContactRound; next_action_at: string | null }[];
 
   // Bucketize dated demands.
   const buckets: Record<DemandBucket, Demand[]> = {
@@ -103,7 +103,8 @@ export default async function HojePage() {
     FIRST_CONTACT: 0, FOLLOW_UP_1: 0, FOLLOW_UP_2: 0, FOLLOW_UP_3: 0,
   };
   for (const r of rounds) {
-    if (r.contact_round in roundCounts) roundCounts[r.contact_round]++;
+    const due = r.contact_round === "FIRST_CONTACT" || (!!r.next_action_at && new Date(r.next_action_at) <= now);
+    if (due && r.contact_round in roundCounts) roundCounts[r.contact_round]++;
   }
   const totalRounds = Object.values(roundCounts).reduce((a, b) => a + b, 0);
 

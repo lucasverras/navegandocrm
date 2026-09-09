@@ -31,6 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     next_action_type: "meeting",
     next_action_at: parsed.data.meeting_at,
     cadence_step: 0,
+    contact_round: null,
     last_activity_at: now,
   };
   if (stage && stage !== "closed") {

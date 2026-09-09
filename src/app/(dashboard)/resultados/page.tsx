@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { Table, THead, TBody, Tr, Th } from "@/components/ui/Table";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { FechadoRow, type Fechado } from "@/components/resultados/FechadoRow";
+import { FechadoCard, FechadoRow, type Fechado } from "@/components/resultados/FechadoRow";
 import { CommissionRow, type CommissionClient } from "@/components/resultados/CommissionRow";
 import { ReimbursementsPanel, type Reimb } from "@/components/resultados/ReimbursementsPanel";
 import { AddClientDialog } from "@/components/resultados/AddClientDialog";
@@ -28,10 +28,11 @@ type ClientRow = ClientFinance & {
   lead_origin: string;
   closed_note: string | null;
   regions: { neighborhood: string } | null;
+  client_finance_events: { event_type: string; amount: number | null; effective_at: string }[];
 };
 
 const FIELDS =
-  "id, name, closed_at, churned_at, initial_monthly_fee, current_monthly_fee, commission_type, commission_percent, first_payment_paid, legacy_months_paid, commission_received, lead_origin, closed_note, regions(neighborhood)";
+  "id, name, closed_at, churned_at, initial_monthly_fee, current_monthly_fee, commission_type, commission_percent, first_payment_paid, legacy_months_paid, commission_received, lead_origin, closed_note, regions(neighborhood), client_finance_events(event_type, amount, effective_at)";
 
 export default async function ResultadosPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab: tabRaw } = await searchParams;
@@ -39,12 +40,16 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   const supabase = await createClient();
 
   const [{ data: clientsRaw }, { data: reimbsRaw }, { data: regionsRaw }] = await Promise.all([
-    supabase.from("leads").select(FIELDS).eq("pipeline_stage", "closed").order("closed_at", { ascending: false, nullsFirst: false }).limit(100),
+    supabase.from("leads").select(FIELDS).eq("pipeline_stage", "closed").order("closed_at", { ascending: false, nullsFirst: false }).limit(1000),
     supabase.from("reimbursements").select("id, description, amount, amount_received, status, spent_at").order("created_at", { ascending: false }).limit(100),
     supabase.from("regions").select("id, neighborhood, city").order("neighborhood", { ascending: true }).limit(100),
   ]);
 
-  const clients = ((clientsRaw ?? []) as unknown as ClientRow[]).map((c) => ({ ...c, region: c.regions?.neighborhood ?? null }));
+  const clients = ((clientsRaw ?? []) as unknown as ClientRow[]).map((c) => ({
+    ...c,
+    region: c.regions?.neighborhood ?? null,
+    finance_events: c.client_finance_events ?? [],
+  }));
   const reimbs = (reimbsRaw ?? []) as unknown as Reimb[];
   const regions = (regionsRaw ?? []) as { id: string; neighborhood: string; city: string }[];
 
@@ -56,11 +61,6 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   const activeCount = clients.filter(isActive).length;
   const mrr = mrrActive(clients);
   const receita = clients.reduce((s, c) => s + receitaGerada(c, now), 0);
-  const fechamentosMes = clients.filter(
-    (c) => c.closed_at && new Date(c.closed_at).getUTCFullYear() === now.getUTCFullYear() && new Date(c.closed_at).getUTCMonth() === now.getUTCMonth()
-  ).length;
-  const withFee = clients.filter((c) => (c.current_monthly_fee ?? c.initial_monthly_fee ?? 0) > 0);
-  const ticket = withFee.length ? withFee.reduce((s, c) => s + (c.current_monthly_fee ?? c.initial_monthly_fee ?? 0), 0) / withFee.length : 0;
   const comGerada = clients.reduce((s, c) => s + commissionGenerated(c), 0);
   const comRecebida = clients.reduce((s, c) => s + (c.commission_received ?? 0), 0);
   const comPendente = clients.reduce((s, c) => s + commissionPending(c), 0);
@@ -115,7 +115,11 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
           {clients.length === 0 ? (
             <Empty />
           ) : (
-            <Table>
+            <>
+            <div className="flex flex-col gap-3 md:hidden">
+              {clients.map((c) => <FechadoCard key={c.id} client={c as Fechado} />)}
+            </div>
+            <div className="hidden md:block"><Table>
               <THead>
                 <Tr>
                   <Th>Cliente</Th>
@@ -136,7 +140,8 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
                   <FechadoRow key={c.id} client={c as Fechado} />
                 ))}
               </TBody>
-            </Table>
+            </Table></div>
+            </>
           )}
         </div>
       )}
@@ -145,7 +150,11 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
         (clients.length === 0 ? (
           <Empty />
         ) : (
-          <Table>
+          <>
+          <div className="flex flex-col gap-3 md:hidden">
+            {clients.map((c) => <FechadoCard key={c.id} client={c as Fechado} />)}
+          </div>
+          <div className="hidden md:block"><Table>
             <THead>
               <Tr>
                 <Th>Cliente</Th>
@@ -166,7 +175,8 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
                 <FechadoRow key={c.id} client={c as Fechado} />
               ))}
             </TBody>
-          </Table>
+          </Table></div>
+          </>
         ))}
 
       {tab === "comissoes" &&

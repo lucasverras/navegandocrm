@@ -33,6 +33,7 @@ function pct(part: number, whole: number): number {
 type ClosedRow = {
   region_id: string | null;
   closed_at: string | null;
+  churned_at: string | null;
   current_monthly_fee: number | null;
   initial_monthly_fee: number | null;
 };
@@ -44,14 +45,14 @@ export async function getAnalytics(supabase: SupabaseClient): Promise<AnalyticsD
   const [selecionados, abordados, respostas, reunioes, fechados, closedRes, regionsRes, lostRes] =
     await Promise.all([
       // 1. Funnel — five bounded count queries (head:true, no rows transferred).
-      leads().select("id", countOpts).eq("triage_status", "approved"),
-      leads().select("id", countOpts).eq("triage_status", "approved").neq("commercial_status", "not_contacted"),
-      leads().select("id", countOpts).in("commercial_status", RESPONSE_STATUSES),
-      leads().select("id", countOpts).or("commercial_status.eq.meeting_scheduled,pipeline_stage.eq.meeting"),
-      leads().select("id", countOpts).eq("pipeline_stage", "closed"),
+      leads().select("id", countOpts).eq("record_source", "radar").eq("triage_status", "approved"),
+      leads().select("id", countOpts).eq("record_source", "radar").eq("triage_status", "approved").neq("commercial_status", "not_contacted"),
+      leads().select("id", countOpts).eq("record_source", "radar").in("commercial_status", RESPONSE_STATUSES),
+      leads().select("id", countOpts).eq("record_source", "radar").or("commercial_status.eq.meeting_scheduled,pipeline_stage.eq.meeting"),
+      leads().select("id", countOpts).eq("record_source", "radar").eq("pipeline_stage", "closed"),
       // 2 + 4. Closed set (small): region_id feeds "por região", closed_at + fees feed MRR.
       leads()
-        .select("region_id, closed_at, current_monthly_fee, initial_monthly_fee")
+        .select("region_id, closed_at, churned_at, current_monthly_fee, initial_monthly_fee")
         .eq("pipeline_stage", "closed"),
       // region id → neighborhood map.
       supabase.from("regions").select("id, neighborhood"),
@@ -110,21 +111,35 @@ export async function getAnalytics(supabase: SupabaseClient): Promise<AnalyticsD
     .sort((a, b) => b.value - a.value)
     .slice(0, 8);
 
-  // 4. MRR bruto acumulado — bucket closed clients by YYYY-MM of closed_at, cumulative fee.
-  const monthTally = new Map<string, number>();
+  // 4. MRR over time: add at contract start and remove after the churn month.
+  const monthDelta = new Map<string, number>();
+  const nextMonth = (month: string) => {
+    const [year, index] = month.split("-").map(Number);
+    const date = new Date(Date.UTC(year, index, 1));
+    return date.toISOString().slice(0, 7);
+  };
   for (const row of closed) {
     if (!row.closed_at) continue;
-    const month = row.closed_at.slice(0, 7); // YYYY-MM
+    const month = row.closed_at.slice(0, 7);
     const fee = row.current_monthly_fee ?? row.initial_monthly_fee ?? 0;
-    monthTally.set(month, (monthTally.get(month) ?? 0) + fee);
+    monthDelta.set(month, (monthDelta.get(month) ?? 0) + fee);
+    if (row.churned_at) {
+      const removalMonth = nextMonth(row.churned_at.slice(0, 7));
+      monthDelta.set(removalMonth, (monthDelta.get(removalMonth) ?? 0) - fee);
+    }
   }
   let running = 0;
-  const mrr: MrrPoint[] = [...monthTally.keys()]
-    .sort()
-    .map((month) => {
-      running += monthTally.get(month) ?? 0;
-      return { month, mrr: running };
-    });
+  const keys = [...monthDelta.keys()].sort();
+  const mrr: MrrPoint[] = [];
+  if (keys.length) {
+    let cursor = keys[0];
+    const end = new Date().toISOString().slice(0, 7);
+    while (cursor <= end) {
+      running += monthDelta.get(cursor) ?? 0;
+      mrr.push({ month: cursor, mrr: Math.max(0, running) });
+      cursor = nextMonth(cursor);
+    }
+  }
 
   return { funnel, funnelTotalPct, regions, lossReasons, mrr };
 }

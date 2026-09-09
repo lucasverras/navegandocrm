@@ -190,7 +190,9 @@ export const NEXT_ACTION_TYPES = [
   "respond",
   "call_decisor",
   "meeting",
+  "prepare_proposal",
   "chase_proposal",
+  "close_deal",
 ] as const;
 export type NextActionType = (typeof NEXT_ACTION_TYPES)[number];
 
@@ -200,7 +202,9 @@ export const NEXT_ACTION_LABELS: Record<NextActionType, string> = {
   respond: "Responder",
   call_decisor: "Chamar decisor",
   meeting: "Reunião",
+  prepare_proposal: "Preparar proposta",
   chase_proposal: "Cobrar proposta",
+  close_deal: "Formalizar fechamento",
 };
 
 export function nextActionLabel(raw: string | null | undefined): string {
@@ -208,13 +212,34 @@ export function nextActionLabel(raw: string | null | undefined): string {
   return NEXT_ACTION_LABELS[raw as NextActionType] ?? raw.replace(/_/g, " ");
 }
 
-export const MEETING_STATUSES = ["scheduled", "held", "proposal_pending", "proposal_sent", "negotiation"] as const;
+export const MEETING_STATUSES = [
+  "scheduled",
+  "held",
+  "no_show",
+  "cancelled",
+  "rescheduled",
+  "proposal_pending",
+  "proposal_sent",
+  "negotiation",
+] as const;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];
 
 export const MEETING_STATUS_LABELS: Record<MeetingStatus, string> = {
   scheduled: "Reunião marcada",
   held: "Reunião realizada",
+  no_show: "Não compareceu",
+  cancelled: "Cancelada",
+  rescheduled: "Reagendada",
   proposal_pending: "Proposta pendente",
   proposal_sent: "Proposta enviada",
   negotiation: "Negociação",
+};
+
+export const PROPOSAL_STATUSES = ["sent", "accepted", "rejected", "revised"] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+export const PROPOSAL_STATUS_LABELS: Record<ProposalStatus, string> = {
+  sent: "Enviada",
+  accepted: "Aceita",
+  rejected: "Recusada",
+  revised: "Em revisão",
 };

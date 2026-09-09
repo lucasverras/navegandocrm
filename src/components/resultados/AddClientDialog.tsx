@@ -21,7 +21,7 @@ export function AddClientDialog({ regions }: { regions: Region[] }) {
     instagram: "",
     region_id: "",
     origin: "Indicação",
-    contract_start: new Date().toISOString().slice(0, 10),
+    contract_start: "",
     contract_end: "",
     monthly_fee: "",
     commission_type: "one_time_percentage" as "one_time_percentage" | "legacy_recurring" | "none",
@@ -50,7 +50,7 @@ export function AddClientDialog({ regions }: { regions: Region[] }) {
         commission_type: f.commission_type,
         commission_percent:
           f.commission_type === "none" ? null : f.commission_type === "legacy_recurring" ? 10 : Number(f.commission_percent || "0"),
-        contract_start: new Date(f.contract_start + "T12:00:00").toISOString(),
+        contract_start: f.contract_start ? new Date(f.contract_start + "T12:00:00").toISOString() : undefined,
         contract_end: f.contract_end ? new Date(f.contract_end + "T12:00:00").toISOString() : null,
         first_payment_paid: f.first_payment_paid,
       }),
@@ -76,17 +76,17 @@ export function AddClientDialog({ regions }: { regions: Region[] }) {
       </Button>
 
       {open && (
-        <div className="animate-fade-in fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[8vh]" onClick={() => setOpen(false)}>
-          <div className="animate-scale-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="animate-fade-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-start sm:p-4 sm:pt-[8vh]" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="add-client-title" className="animate-scale-in max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-xl border border-border bg-surface p-5 shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-foreground">Adicionar cliente fechado</h2>
+              <h2 id="add-client-title" className="font-display text-lg font-bold text-foreground">Adicionar cliente fechado</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="text-muted hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className={`${label} col-span-2`}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className={`${label} sm:col-span-2`}>
                 Nome do cliente *
                 <input className={input} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Dom Sushi Mooca" />
               </label>
@@ -120,7 +120,7 @@ export function AddClientDialog({ regions }: { regions: Region[] }) {
                 </select>
               </label>
               <label className={label}>
-                Entrou em
+                Entrou em (opcional)
                 <input type="date" className={input} value={f.contract_start} onChange={(e) => set("contract_start", e.target.value)} />
               </label>
               <label className={label}>
@@ -149,7 +149,7 @@ export function AddClientDialog({ regions }: { regions: Region[] }) {
                   onChange={(e) => set("commission_percent", e.target.value)}
                 />
               </label>
-              <label className="col-span-2 flex items-center gap-2 text-sm text-foreground">
+              <label className="flex min-h-11 items-center gap-2 text-sm text-foreground sm:col-span-2">
                 <input type="checkbox" checked={f.first_payment_paid} onChange={(e) => set("first_payment_paid", e.target.checked)} className="accent-accent" />
                 1ª mensalidade já paga (gera a comissão pontual)
               </label>

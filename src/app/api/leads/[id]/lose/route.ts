@@ -29,7 +29,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         pipeline_stage: "ready_to_approach",
         stage_changed_at: now,
         next_action_type: "first_approach",
-        next_action_at: null,
+        next_action_at: now,
+        next_follow_up_at: null,
+        contact_round: "FIRST_CONTACT",
+        cadence_step: 0,
+        business_status: "in_progress",
         last_activity_at: now,
       })
       .eq("id", id);
@@ -46,6 +50,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       next_action_type: null,
       next_action_at: null,
       next_follow_up_at: null,
+      contact_round: null,
+      cadence_step: 0,
       last_activity_at: now,
     })
     .eq("id", id);

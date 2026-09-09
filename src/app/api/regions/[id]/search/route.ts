@@ -44,9 +44,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const region = regionRaw as unknown as RegionRow;
 
+  const mutableCategories = [...categories];
   const { data: searchRaw } = await supabase
     .from("searches")
-    .insert({ region_id: regionId, status: "running", categories })
+    .insert({ region_id: regionId, status: "running", categories: mutableCategories })
     .select()
     .single();
   const search = searchRaw as unknown as SearchRow | null;

@@ -7,5 +7,15 @@ export async function requireUser() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user;
+  if (!user) return null;
+
+  // Server routes often use the service-role client after this check. A valid Auth
+  // account alone is therefore insufficient: only explicitly provisioned team profiles
+  // may reach those privileged operations.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+  return profile ? user : null;
 }

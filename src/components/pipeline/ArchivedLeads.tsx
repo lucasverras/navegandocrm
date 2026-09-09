@@ -49,7 +49,7 @@ export function ArchivedLeads({ leads, regionMap }: { leads: LeadRow[]; regionMa
               </Link>
               <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
                 <span>
-                  {regionMap[lead.region_id] ?? "—"} · {categoryLabel(lead.category)}
+                  {(lead.region_id ? regionMap[lead.region_id] : null) ?? "—"} · {categoryLabel(lead.category)}
                 </span>
                 {lead.lost_reason && <Badge tone="danger">{lead.lost_reason}</Badge>}
               </div>

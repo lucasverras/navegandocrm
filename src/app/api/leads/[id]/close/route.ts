@@ -38,6 +38,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       commission_type: parsed.data.commission_type ?? "one_time_percentage",
       commission_percent: parsed.data.commission_percent ?? null,
       churned_at: null,
+      business_status: "client",
+      contact_round: null,
+      cadence_step: 0,
       // Deal done — no pending demands.
       next_action_type: null,
       next_action_at: null,
@@ -52,6 +55,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: "closed_won",
     channel: "system",
     metadata: { service: parsed.data.closed_service, value: parsed.data.closed_value ?? null, changed_by: user.id },
+  });
+  await admin.from("client_finance_events").insert({
+    lead_id: leadId,
+    event_type: "contract_started",
+    amount: monthly,
+    effective_at: now,
+    created_by: user.id,
+    metadata: { service: parsed.data.closed_service },
   });
 
   return NextResponse.json({ ok: true });

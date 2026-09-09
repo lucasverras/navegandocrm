@@ -177,10 +177,11 @@ export function CommandPalette() {
 }
 
 // Clickable search affordance for the nav / mobile (keyboard has ⌘K).
-export function SearchTrigger({ className }: { className?: string }) {
+export function SearchTrigger({ className, compact = false }: { className?: string; compact?: boolean }) {
   return (
     <button
       type="button"
+      aria-label="Buscar"
       onClick={() => window.dispatchEvent(new Event("open-command-palette"))}
       className={
         className ??
@@ -188,8 +189,8 @@ export function SearchTrigger({ className }: { className?: string }) {
       }
     >
       <Search className="h-4 w-4" />
-      <span className="flex-1 text-left">Buscar</span>
-      <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] md:inline">⌘K</kbd>
+      {compact ? <span className="sr-only">Buscar</span> : <span className="flex-1 text-left">Buscar</span>}
+      {!compact && <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] md:inline">⌘K</kbd>}
     </button>
   );
 }

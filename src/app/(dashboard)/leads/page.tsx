@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { LeadsExplorer } from "@/components/leads/LeadsExplorer";
 import type { LeadRow, RegionRow } from "@/types/database";
+import { PIPELINE_STAGES, type PipelineStage } from "@/types/domain";
 
 export type LeadWithRegion = LeadRow & { regions: Pick<RegionRow, "id" | "neighborhood" | "city"> | null };
 
@@ -39,7 +40,9 @@ export default async function LeadsPage({
   if (params.region) query = query.eq("region_id", params.region);
   if (params.category) query = query.eq("category", params.category);
   if (params.minRating) query = query.gte("google_rating", Number(params.minRating));
-  if (params.stage) query = query.eq("pipeline_stage", params.stage);
+  if (params.stage && PIPELINE_STAGES.includes(params.stage as PipelineStage)) {
+    query = query.eq("pipeline_stage", params.stage as PipelineStage);
+  }
   if (params.assignedTo) query = query.eq("assigned_to", params.assignedTo);
   if (params.hasPhone === "1") query = query.not("phone", "is", null);
   // Simplification: "com mensagem" is approximated via commercial_status !== not_contacted

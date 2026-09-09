@@ -305,7 +305,7 @@ export function PipelineBoard({
                       <PipelineCard
                         key={lead.id}
                         lead={lead}
-                        regionName={regionMap[lead.region_id]}
+                        regionName={lead.region_id ? regionMap[lead.region_id] : undefined}
                         whatsappMessage={messages[lead.id]}
                         onMoveTo={(s) => handleMoveTo(lead, s)}
                         onMeetingStatusChange={(status) => handleMeetingStatusChange(lead, status)}
@@ -323,7 +323,7 @@ export function PipelineBoard({
             {activeLead ? (
               <PipelineCard
                 lead={activeLead}
-                regionName={regionMap[activeLead.region_id]}
+                regionName={activeLead.region_id ? regionMap[activeLead.region_id] : undefined}
                 onMoveTo={() => {}}
                 onMeetingStatusChange={() => {}}
                 onLose={() => {}}

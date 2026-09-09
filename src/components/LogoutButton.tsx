@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { LogOut } from "lucide-react";
 
-export function LogoutButton() {
+export function LogoutButton({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -16,9 +16,9 @@ export function LogoutButton() {
   }
 
   return (
-    <Button variant="ghost" size="sm" className="justify-start" onClick={handleLogout}>
+    <Button variant="ghost" size="sm" aria-label="Sair" className={compact ? "h-11 w-11 px-0" : "justify-start"} onClick={handleLogout}>
       <LogOut className="h-4 w-4" />
-      Sair
+      {compact ? <span className="sr-only">Sair</span> : "Sair"}
     </Button>
   );
 }

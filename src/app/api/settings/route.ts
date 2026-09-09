@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Json } from "@/types/database";
 import { z } from "zod";
 
 // Settings are key/value rows in `public.settings` (jsonb value). Two keys matter here:
@@ -65,7 +66,7 @@ export async function PATCH(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const admin = createAdminClient();
-  const rows: { key: string; value: unknown }[] = [];
+  const rows: { key: string; value: Json }[] = [];
 
   if (parsed.data.usage_limits) {
     rows.push({ key: "usage_limits", value: parsed.data.usage_limits });

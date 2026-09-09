@@ -28,6 +28,19 @@ test("receita gerada: Jul→Nov, R$4.000/mês = 5 meses = R$20.000 (§97)", () =
   assert.equal(receitaGerada(c), 20000);
 });
 
+test("mudança de mensalidade não altera receita dos meses anteriores", () => {
+  const c: ClientFinance = {
+    ...base,
+    churned_at: "2026-11-15T00:00:00Z",
+    current_monthly_fee: 5000,
+    finance_events: [
+      { event_type: "fee_changed", amount: 5000, effective_at: "2026-10-01T12:00:00Z" },
+    ],
+  };
+  // Jul–Set: 3 × 4.000; Out–Nov: 2 × 5.000.
+  assert.equal(receitaGerada(c), 22000);
+});
+
 test("comissão pontual: 20% de R$4.000 = R$800 quando 1ª mensalidade paga (§45/§95)", () => {
   assert.equal(commissionGenerated({ ...base, first_payment_paid: false }), 0);
   assert.equal(commissionGenerated({ ...base, first_payment_paid: true }), 800);

@@ -5,7 +5,8 @@ import { NavLinks, type NavItem } from "@/components/NavLinks";
 import { CommandPalette, SearchTrigger } from "@/components/CommandPalette";
 import { LeadDrawer } from "@/components/leads/LeadDrawer";
 import { NewLeadDialog } from "@/components/NewLeadDialog";
-import { Compass } from "lucide-react";
+import Link from "next/link";
+import { Compass, Settings } from "lucide-react";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -61,24 +62,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
 
-      <div className="flex items-center justify-between border-b border-border bg-surface/60 px-4 py-3 md:hidden">
+      <div className="flex items-center justify-between border-b border-border bg-surface/60 px-4 py-2 md:hidden">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-full border border-accent/40 bg-accent-soft text-accent-2">
             <Compass className="h-3.5 w-3.5" />
           </div>
-          <span className="font-display text-sm font-bold uppercase tracking-wide">Radar Navegando</span>
+          <span className="font-display text-sm font-bold uppercase tracking-wide">Radar</span>
         </div>
-        <LogoutButton />
-      </div>
-      <div className="overflow-x-auto border-b border-border bg-surface/40 px-2 py-2 md:hidden">
-        <div className="flex w-max gap-1">
-          <NavLinks items={navItems} orientation="horizontal" />
+        <div className="flex items-center gap-1">
+          <SearchTrigger compact className="flex h-11 w-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-foreground" />
+          <NewLeadDialog compact regions={regions} />
+          <Link href="/configuracoes" aria-label="Configurações" className="flex h-11 w-11 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-foreground">
+            <Settings className="h-4 w-4" />
+          </Link>
+          <LogoutButton compact />
         </div>
       </div>
 
-      <main className="min-h-screen flex-1 overflow-x-hidden">
+      <main className="min-h-screen flex-1 overflow-x-hidden pb-16 md:pb-0">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
       </main>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        <NavLinks items={navItems.slice(0, 5)} orientation="bottom" />
+      </div>
     </div>
   );
 }

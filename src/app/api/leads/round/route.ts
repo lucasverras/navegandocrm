@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CONTACT_ROUNDS } from "@/types/domain";
+import { CONTACT_ROUNDS, type ContactRound } from "@/types/domain";
 
 // Returns leads for a specific contact_round, ready to be worked one-at-a-time.
 // Includes the latest message (for WhatsApp prefill) and decision-maker.
@@ -13,21 +13,27 @@ export async function GET(req: NextRequest) {
   if (!round || !CONTACT_ROUNDS.includes(round as (typeof CONTACT_ROUNDS)[number])) {
     return NextResponse.json({ error: "Rodada inválida" }, { status: 400 });
   }
+  const contactRound = round as ContactRound;
 
   const admin = createAdminClient();
 
-  const { data: leads } = await admin
+  let leadsQuery = admin
     .from("leads")
     .select(
       "id, name, phone, instagram, instagram_handle, instagram_url, website, maps_url, " +
       "contact_round, next_action_type, next_action_at, commercial_status, " +
       "region:regions(neighborhood)"
     )
-    .eq("contact_round", round)
+    .eq("contact_round", contactRound)
     .is("archived_at", null)
-    .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
+    .or("pipeline_stage.is.null,pipeline_stage.neq.closed");
+  if (contactRound !== "FIRST_CONTACT") {
+    leadsQuery = leadsQuery.lte("next_action_at", new Date().toISOString());
+  }
+  const { data: leads, error: leadsError } = await leadsQuery
     .order("last_activity_at", { ascending: true })
     .limit(50);
+  if (leadsError) return NextResponse.json({ error: leadsError.message }, { status: 500 });
 
   const ids = (leads ?? []).map((l) => (l as unknown as { id: string }).id);
 
@@ -35,7 +41,7 @@ export async function GET(req: NextRequest) {
     ids.length
       ? admin
           .from("outreach_messages")
-          .select("lead_id, content, created_at")
+          .select("lead_id, content, contact_round, created_at")
           .in("lead_id", ids)
           .order("created_at", { ascending: false })
           .limit(100)
@@ -50,7 +56,10 @@ export async function GET(req: NextRequest) {
   ]);
 
   const messageMap = new Map<string, string>();
-  for (const m of (messages ?? []) as { lead_id: string; content: string }[]) {
+  for (const m of (messages ?? []) as { lead_id: string; content: string; contact_round: string | null }[]) {
+    if (m.contact_round === contactRound && !messageMap.has(m.lead_id)) messageMap.set(m.lead_id, m.content);
+  }
+  for (const m of (messages ?? []) as { lead_id: string; content: string; contact_round: string | null }[]) {
     if (!messageMap.has(m.lead_id)) messageMap.set(m.lead_id, m.content);
   }
   const dmMap = new Map<string, string>();

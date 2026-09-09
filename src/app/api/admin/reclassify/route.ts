@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { reclassifyByNameCategory } from "@/lib/discovery-filters";
+import { reclassifyByNameCategory, type ExclusionReason } from "@/lib/discovery-filters";
 
 export const maxDuration = 60;
 
@@ -43,7 +43,7 @@ async function run(dryRun: boolean) {
   const before = funnel(leads);
 
   // Bucket the junk by reason.
-  const junkByReason = new Map<string, string[]>();
+  const junkByReason = new Map<ExclusionReason, string[]>();
   for (const lead of leads) {
     // Never auto-filter an actual client.
     const reason = lead.business_status === "client" ? null : reclassifyByNameCategory(lead.name, lead.category);

@@ -15,7 +15,7 @@ import { checkUsageLimit, logApiUsage } from "@/lib/cost-control";
 import { pickRelevantCase, describeCase, NAVEGANDO_CASES, type NavegandoCase } from "@/lib/cases";
 import { looksGeneric, REGENERATE_HINT } from "@/lib/message-quality";
 import { categoryLabel } from "@/types/domain";
-import type { MessageVariant } from "@/types/domain";
+import type { ContactRound, MessageVariant } from "@/types/domain";
 import type { LeadRow, DecisionMakerRow, LeadAnalysisRow, RegionRow } from "@/types/database";
 
 export const maxDuration = 60;
@@ -157,6 +157,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { data: leadRaw } = await admin.from("leads").select("*").eq("id", leadId).single();
   if (!leadRaw) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   const lead = leadRaw as unknown as LeadRow;
+  const contactRound: ContactRound = lead.contact_round ?? "FIRST_CONTACT";
+  const isFollowUp = contactRound !== "FIRST_CONTACT";
   if (lead.triage_status === "rejected" || lead.triage_status === "auto_filtered") {
     return NextResponse.json({ error: "Lead não aprovado na triagem" }, { status: 409 });
   }
@@ -179,6 +181,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         output_tokens: 0,
         estimated_cost_usd: 0,
         rationale: { variant: chosenVariant, picked: true },
+        contact_round: contactRound,
+        purpose: isFollowUp ? "follow_up" : "initial",
       })
       .select()
       .single();
@@ -305,7 +309,7 @@ ${context}`,
 
   // ---- Single-message mode (default). ----
   let variant: MessageVariant = parsed.data.variant ?? (analysis?.recommended_approach as MessageVariant) ?? "question";
-  if (!decisionMaker?.name) variant = "routing";
+  if (!decisionMaker?.name && !isFollowUp) variant = "routing";
   else if (analysis?.agency_status === "confirmed" || analysis?.agency_status === "probable") variant = "agency";
   else if (analysis?.marketing_status === "abandoned") variant = "abandoned_instagram";
 
@@ -321,6 +325,8 @@ ${context}`,
         input_tokens: 0,
         output_tokens: 0,
         estimated_cost_usd: 0,
+        contact_round: contactRound,
+        purpose: "initial",
       })
       .select()
       .single();
@@ -334,7 +340,7 @@ ${context}`,
   // Message Studio: when steering an existing message, give the model the current version to
   // rewrite — it should apply the adjustment, not start from zero.
   let currentBlock = "";
-  if (instruction) {
+  if (instruction || isFollowUp) {
     const { data: prev } = await admin
       .from("outreach_messages")
       .select("content")
@@ -344,14 +350,19 @@ ${context}`,
       .maybeSingle();
     const prevContent = (prev as { content: string } | null)?.content;
     if (prevContent) {
-      currentBlock = `\n\nMensagem atual (reescreva aplicando o ajuste, mantendo o que já funciona):\n"""\n${prevContent}\n"""`;
+      currentBlock = isFollowUp
+        ? `\n\nMensagem enviada anteriormente (faça continuidade sem repeti-la):\n"""\n${prevContent}\n"""`
+        : `\n\nMensagem atual (reescreva aplicando o ajuste, mantendo o que já funciona):\n"""\n${prevContent}\n"""`;
     }
   }
   const steerBlock = instruction ? `\n\nAJUSTE PEDIDO PELO OPERADOR — aplique obrigatoriamente: ${instruction}` : "";
+  const roundBlock = isFollowUp
+    ? `\n\nEsta é a rodada ${contactRound}. Escreva um follow-up curto e natural. Reconheça o contato anterior, acrescente apenas um novo motivo concreto para responder e termine com uma pergunta fácil. Não refaça a apresentação inicial e não cobre de forma agressiva.`
+    : "";
 
   const buildInput = (extra: string) => `${VOICE_RULES}
 
-Escreva UMA mensagem seguindo: saudação curta → observação específica → o que a Navegando faz (1 frase concreta) → uma pergunta simples.${refineNote} ${variantInstruction(variant)}${extra}${steerBlock}${currentBlock}
+Escreva UMA mensagem seguindo: saudação curta → observação específica → o que a Navegando faz (1 frase concreta) → uma pergunta simples.${refineNote} ${variantInstruction(variant)}${extra}${steerBlock}${roundBlock}${currentBlock}
 
 Contexto:
 ${context}
@@ -419,6 +430,8 @@ Responda apenas com o texto da mensagem, sem aspas, sem comentários.`;
       estimated_cost_usd: cost,
       refined: refine,
       rationale,
+      contact_round: contactRound,
+      purpose: isFollowUp ? "follow_up" : "initial",
     })
     .select()
     .single();

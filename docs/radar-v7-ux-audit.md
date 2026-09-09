@@ -8,7 +8,7 @@
 - **Informações úteis:** Checklists, rodadas com contagem, demandas com data, reembolsos pendentes.
 - **Removidos:** KPIs genéricos, "leads score alto", "sem atividade 7d", "mensagens prontas", dashboard cards duplicados.
 - **Melhorado:** Greeting personalizado, layout 2 colunas, stats strip na direita.
-- **Pendente:** Mobile layout (2 colunas → stack).
+- **Mobile:** Layout empilhado, busca e novo lead no topo, navegação inferior fixa.
 
 ## /prospeccao (Prospecção)
 
@@ -28,7 +28,7 @@
 - **Informações úteis:** Nome, telefone, @handle, round (FUP 1/2/3), proposta R$/mês, follow-up com semáforo.
 - **Removidos:** Score, categoria, responsável, badges múltiplos.
 - **Melhorado:** Contrast (borders, column bg, drag ring), per-column "Adicionar lead", drawer no click, round badge, follow-up D+1/2/5/10 no hover.
-- **Pendente:** Pipeline layout V2 (§43 — testar 2 linhas).
+- **Mobile:** Uma etapa por vez, coluna em largura total e ações de follow-up/perda sempre visíveis ao toque.
 
 ## /resultados (Resultados)
 
@@ -38,7 +38,7 @@
 - **Informações úteis:** KPI strip denso, tabela com comissão/recebida/pendente por cliente.
 - **Removidos:** Hero numbers gigantes (3×34px), quick-list duplicada, Mini cards 8×.
 - **Melhorado:** Tabela como conteúdo principal, EditClientDialog (§56), per-client breakdown.
-- **Pendente:** Editar via drawer em vez de dialog (§60).
+- **Mobile:** Cards financeiros substituem a tabela de 11 colunas; Editar abre bottom sheet com rolagem e altura limitada.
 
 ## /historico (Histórico)
 
@@ -57,10 +57,27 @@
 ## Busca
 
 - **Funciona:** Cmd+K (CommandPalette) busca leads por nome.
-- **Pendente:** Adicionar ações no palette (§ Twenty Cmd+K pattern).
+- **Mobile:** Gatilho de busca disponível no cabeçalho.
 
 ## Fullscreen modals
 
 - **TrabalharFila:** Demandas urgentes uma por vez. Sem router.refresh.
 - **TrabalharRodada:** Leads por contact_round. Mensagem sugerida, Copiar, WhatsApp, "Enviado ✓", resultados.
 - **Tinder:** Um restaurante por vez. Foto, atalhos, background prep.
+
+## Simulação mobile
+
+- Executada em Chrome headless com viewport de 390×844.
+- /hoje: sem overflow horizontal, busca, novo lead e cinco destinos no bottom nav.
+- /pipeline: troca de etapa, cards em largura total e ações por toque verificadas.
+- /resultados?tab=fechados: 20 cards renderizados; botão Editar abriu o diálogo e ele coube no viewport.
+- Evidências locais: .context/mobile-hoje.png, .context/mobile-pipeline.png e .context/mobile-resultados-edit.png.
+
+## Simulação diária completa
+
+- Executada com usuário e leads temporários contra o build de produção local.
+- Caminho ganho: criar lead → mensagem enviada → cadência → resposta com nota → reunião → reunião realizada → proposta → proposta aceita → fechamento → alteração de mensalidade → primeira mensalidade paga → comissão recebida.
+- Estado final validado: cliente fechado, business_status client, sem próxima ação, mensalidade atual R$ 4.500, comissão recebida R$ 500 e quatro eventos financeiros.
+- Caminho perdido: criar lead → perder → reativar; voltou para A abordar com FIRST_CONTACT e próxima ação definida.
+- O botão Editar foi aberto e salvo em Resultados no viewport 390×844.
+- Usuário e leads de teste foram removidos depois da execução.

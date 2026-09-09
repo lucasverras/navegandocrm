@@ -8,9 +8,7 @@ import type { LeadRow, RegionRow } from "@/types/database";
 export default async function PipelinePage() {
   const supabase = await createClient();
 
-  // ALL queries in parallel — zero waterfall. Messages are fetched globally (latest 200) and
-  // mapped client-side by lead_id, avoiding the sequential dependency on the leads query.
-  const [{ data: leads }, { data: archived }, { data: regions }, { data: msgsRaw }] = await Promise.all([
+  const [{ data: leads }, { data: archived }, { data: regions }] = await Promise.all([
     supabase
       .from("leads")
       .select(
@@ -28,24 +26,22 @@ export default async function PipelinePage() {
       .order("updated_at", { ascending: false })
       .limit(100),
     supabase.from("regions").select("id, neighborhood").limit(100),
-    supabase
-      .from("outreach_messages")
-      .select("lead_id, content, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200),
   ]);
 
   const typedLeads = (leads as unknown as LeadRow[] | null) ?? [];
   const typedArchived = (archived as unknown as LeadRow[] | null) ?? [];
   const typedRegions = (regions as unknown as Pick<RegionRow, "id" | "neighborhood">[] | null) ?? [];
+  const boardIds = typedLeads.map((lead) => lead.id);
+  const { data: msgsRaw } = boardIds.length
+    ? await supabase.rpc("latest_outreach_messages", { p_lead_ids: boardIds })
+    : { data: [] };
 
   const regionMap: Record<string, string> = {};
   for (const r of typedRegions) regionMap[r.id] = r.neighborhood;
 
   const messages: Record<string, string> = {};
-  const boardIdSet = new Set(typedLeads.filter((l) => l.phone).map((l) => l.id));
   for (const m of (msgsRaw ?? []) as { lead_id: string; content: string }[]) {
-    if (boardIdSet.has(m.lead_id) && !messages[m.lead_id]) messages[m.lead_id] = m.content;
+    messages[m.lead_id] = m.content;
   }
 
   return (

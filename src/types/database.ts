@@ -19,7 +19,7 @@ export interface RegionRow {
 
 export interface SearchRow {
   id: string;
-  region_id: string;
+  region_id: string | null;
   status: "running" | "completed" | "failed" | "partial";
   categories: string[];
   queries_executed: number;
@@ -33,7 +33,7 @@ export interface SearchRow {
 
 export interface LeadRow {
   id: string;
-  region_id: string;
+  region_id: string | null;
   place_id: string;
   name: string;
   category: string;
@@ -92,10 +92,20 @@ export interface LeadRow {
   first_contacted_at: string | null;
   last_contacted_at: string | null;
   meeting_at: string | null;
-  meeting_status: "scheduled" | "held" | "proposal_pending" | "proposal_sent" | "negotiation" | null;
+  meeting_status:
+    | "scheduled"
+    | "held"
+    | "no_show"
+    | "cancelled"
+    | "rescheduled"
+    | "proposal_pending"
+    | "proposal_sent"
+    | "negotiation"
+    | null;
   meeting_link: string | null;
   meeting_note: string | null;
   proposal_sent_at: string | null;
+  proposal_status: "sent" | "accepted" | "rejected" | "revised" | null;
   proposal_value: number | null;
   proposal_note: string | null;
   closed_at: string | null;
@@ -104,6 +114,16 @@ export interface LeadRow {
   closed_note: string | null;
   churned_at: string | null;
   received_value: number | null;
+  commission_type: "legacy_recurring" | "one_time_percentage" | "none";
+  commission_percent: number | null;
+  initial_monthly_fee: number | null;
+  current_monthly_fee: number | null;
+  first_payment_paid: boolean;
+  first_payment_at: string | null;
+  legacy_months_paid: number;
+  commission_received: number;
+  lead_origin: string;
+  record_source: "radar" | "manual" | "historical";
   lost_reason: string | null;
   archived_at: string | null;
   discovery_campaign_id: string | null;
@@ -241,6 +261,29 @@ export interface OutreachMessageRow {
   edited: boolean;
   refined: boolean;
   rationale: Json | null;
+  contact_round: "FIRST_CONTACT" | "FOLLOW_UP_1" | "FOLLOW_UP_2" | "FOLLOW_UP_3" | null;
+  purpose: "initial" | "follow_up";
+  created_at: string;
+}
+
+export interface ClientFinanceEventRow {
+  id: string;
+  lead_id: string;
+  event_type:
+    | "contract_started"
+    | "fee_changed"
+    | "commission_rule_changed"
+    | "commission_generated"
+    | "commission_received"
+    | "client_payment"
+    | "contract_ended"
+    | "contract_reactivated"
+    | "adjustment";
+  amount: number | null;
+  effective_at: string;
+  note: string | null;
+  metadata: Json;
+  created_by: string | null;
   created_at: string;
 }
 
@@ -313,10 +356,23 @@ export interface ProfileRow {
   created_at: string;
 }
 
+export interface ReimbursementRow {
+  id: string;
+  lead_id: string | null;
+  description: string;
+  amount: number;
+  amount_received: number;
+  spent_at: string;
+  status: "pendente" | "recebido";
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 type TableDef<Row> = {
-  Row: Row;
-  Insert: Partial<Row>;
-  Update: Partial<Row>;
+  Row: Row & Record<string, unknown>;
+  Insert: Partial<Row> & Record<string, unknown>;
+  Update: Partial<Row> & Record<string, unknown>;
   Relationships: [];
 };
 
@@ -338,11 +394,25 @@ export interface Database {
       settings: TableDef<SettingsRow>;
       checklists: TableDef<ChecklistRow>;
       profiles: TableDef<ProfileRow>;
+      reimbursements: TableDef<ReimbursementRow>;
+      client_finance_events: TableDef<ClientFinanceEventRow>;
     };
     Views: {
-      discovery_campaign_stats: { Row: DiscoveryCampaignStatsRow };
+      discovery_campaign_stats: {
+        Row: DiscoveryCampaignStatsRow & Record<string, unknown>;
+        Relationships: [];
+      };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      increment_client_finance: {
+        Args: { p_lead_id: string; p_field: string; p_amount: number; p_user: string };
+        Returns: number;
+      };
+      latest_outreach_messages: {
+        Args: { p_lead_ids: string[] };
+        Returns: { lead_id: string; content: string; created_at: string }[];
+      };
+    };
     Enums: Record<string, never>;
   };
 }

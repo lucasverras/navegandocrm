@@ -12,7 +12,7 @@ const ORIGINS = ["Radar", "Indicação", "Evento", "Instagram", "Networking", "P
 
 // Global "+ Novo lead" — keeps the Trello flexibility: add any lead by hand with origin, region
 // and starting stage. Opens on the sidebar button or the `open-new-lead` window event.
-export function NewLeadDialog({ regions }: { regions: Region[] }) {
+export function NewLeadDialog({ regions, compact = false }: { regions: Region[]; compact?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,22 +65,25 @@ export function NewLeadDialog({ regions }: { regions: Region[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-2"
+        aria-label="Novo lead"
+        className={compact
+          ? "flex h-11 w-11 items-center justify-center rounded-md bg-accent text-white transition-colors hover:bg-accent-2"
+          : "flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-2"}
       >
-        <Plus className="h-4 w-4" /> Novo lead
+        <Plus className="h-4 w-4" /> {compact ? <span className="sr-only">Novo lead</span> : "Novo lead"}
       </button>
 
       {open && (
-        <div className="animate-fade-in fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[8vh]" onClick={() => setOpen(false)}>
-          <div className="animate-scale-in w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="animate-fade-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-start sm:p-4 sm:pt-[8vh]" onClick={() => setOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="new-lead-title" className="animate-scale-in max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-xl border border-border bg-surface p-5 shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold text-foreground">Novo lead</h2>
+              <h2 id="new-lead-title" className="font-display text-lg font-bold text-foreground">Novo lead</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="Fechar" className="text-muted hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className={`${label} col-span-2`}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className={`${label} sm:col-span-2`}>
                 Nome *
                 <input className={input} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Ex: Croma Burgers" />
               </label>
@@ -113,7 +116,7 @@ export function NewLeadDialog({ regions }: { regions: Region[] }) {
                   ))}
                 </select>
               </label>
-              <label className={`${label} col-span-2`}>
+              <label className={`${label} sm:col-span-2`}>
                 Etapa
                 <select className={input} value={f.stage} onChange={(e) => set("stage", e.target.value)}>
                   {PIPELINE_STAGES.filter((s) => s !== "closed").map((s) => (
@@ -123,7 +126,7 @@ export function NewLeadDialog({ regions }: { regions: Region[] }) {
                   ))}
                 </select>
               </label>
-              <label className={`${label} col-span-2`}>
+              <label className={`${label} sm:col-span-2`}>
                 Observação
                 <input className={input} value={f.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Opcional" />
               </label>

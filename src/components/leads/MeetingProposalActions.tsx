@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { CalendarClock, FileText, X } from "lucide-react";
+import { PROPOSAL_STATUS_LABELS, PROPOSAL_STATUSES, type ProposalStatus } from "@/types/domain";
 
 // Structured Reunião + Proposta capture (simple, per brief). Lives in the lead header actions.
-export function MeetingProposalActions({ leadId }: { leadId: string }) {
+export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: string; proposalStatus?: ProposalStatus | null }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<null | "meeting" | "proposal">(null);
   const [busy, setBusy] = useState(false);
@@ -46,6 +47,20 @@ export function MeetingProposalActions({ leadId }: { leadId: string }) {
     router.refresh();
   }
 
+  async function updateProposalStatus(status: ProposalStatus) {
+    if (status === "sent") return;
+    setBusy(true);
+    const res = await fetch(`/api/leads/${leadId}/proposal`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setBusy(false);
+    if (!res.ok) return toast.error("Erro ao atualizar a proposta");
+    toast.success(`Proposta ${PROPOSAL_STATUS_LABELS[status].toLowerCase()}`);
+    router.refresh();
+  }
+
   const input = "h-9 w-full rounded-md border border-border bg-surface-2 px-2 text-sm text-foreground outline-none focus:border-accent";
 
   return (
@@ -56,10 +71,23 @@ export function MeetingProposalActions({ leadId }: { leadId: string }) {
       <Button size="sm" variant="secondary" onClick={() => { setNote(""); setValue(""); setDialog("proposal"); }}>
         <FileText className="h-3.5 w-3.5" /> Proposta
       </Button>
+      {proposalStatus && (
+        <select
+          aria-label="Status da proposta"
+          value={proposalStatus}
+          disabled={busy}
+          onChange={(e) => updateProposalStatus(e.target.value as ProposalStatus)}
+          className="h-8 rounded-md border border-border bg-surface-2 px-2 text-xs text-foreground"
+        >
+          {PROPOSAL_STATUSES.map((status) => (
+            <option key={status} value={status}>{PROPOSAL_STATUS_LABELS[status]}</option>
+          ))}
+        </select>
+      )}
 
       {dialog && (
-        <div className="animate-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDialog(null)}>
-          <div className="animate-scale-in w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="animate-fade-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onClick={() => setDialog(null)}>
+          <div role="dialog" aria-modal="true" className="animate-scale-in max-h-[92dvh] w-full max-w-sm overflow-y-auto rounded-t-xl border border-border bg-surface p-5 shadow-xl sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-foreground">{dialog === "meeting" ? "Marcar reunião" : "Registrar proposta"}</h2>
               <button type="button" onClick={() => setDialog(null)} aria-label="Fechar" className="text-muted hover:text-foreground">

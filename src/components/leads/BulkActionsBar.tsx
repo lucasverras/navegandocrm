@@ -154,7 +154,7 @@ export function BulkActionsBar({
             value={stageChoice}
             onChange={(e) => setStageChoice(e.target.value as PipelineStage)}
           >
-            {PIPELINE_STAGES.map((s) => (
+            {PIPELINE_STAGES.filter((s) => s !== "closed").map((s) => (
               <option key={s} value={s}>
                 {PIPELINE_STAGE_LABELS[s]}
               </option>

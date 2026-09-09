@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { FIRST_PIPELINE_STAGE, PIPELINE_STAGES } from "@/types/domain";
 import { extractInstagramHandle, buildInstagramUrl } from "@/lib/instagram";
+import type { LeadRow } from "@/types/database";
 
 const manualLeadSchema = z.object({
   name: z.string().min(2).max(200),
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
   const admin = createAdminClient();
 
-  const row: Record<string, unknown> = {
+  const row: Partial<LeadRow> = {
     region_id: d.region_id ?? null,
     place_id: `manual:${crypto.randomUUID()}`,
     name: d.name.trim(),
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
     instagram_checked_at: handle ? now : null,
     notes: d.notes?.trim() || null,
     lead_origin: d.origin || "manual",
+    record_source: d.as_client ? "historical" : "manual",
     pre_score: 0,
     triage_status: "approved",
     reviewed_at: now,
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
   if (d.as_client) {
     const monthly = d.monthly_fee ?? null;
     row.pipeline_stage = "closed";
-    row.closed_at = d.contract_start ?? now;
+    row.closed_at = d.contract_start ?? null;
     row.churned_at = d.contract_end ?? null;
     row.closed_value = monthly;
     row.initial_monthly_fee = monthly;
@@ -89,8 +91,20 @@ export async function POST(req: NextRequest) {
     lead_id: (data as { id: string }).id,
     event_type: d.as_client ? "client_added_manual" : "lead_created_manual",
     channel: "system",
-    metadata: { by: user.id, origin: row.lead_origin },
+    metadata: { by: user.id, origin: row.lead_origin ?? "manual" },
   });
+
+  if (d.as_client) {
+    await admin.from("client_finance_events").insert({
+      lead_id: (data as { id: string }).id,
+      event_type: "contract_started",
+      amount: d.monthly_fee ?? null,
+      effective_at: d.contract_start ?? now,
+      note: d.contract_start ? null : "Cliente histórico; data de início ainda não informada",
+      created_by: user.id,
+      metadata: { source: "manual_historical_import" },
+    });
+  }
 
   return NextResponse.json({ lead: data });
 }

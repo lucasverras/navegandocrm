@@ -104,7 +104,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <WhatsAppButton phone={lead.phone} message={latestMessage?.content ?? ""} />
           <RegisterContactButton leadId={lead.id} />
           <FollowUpPicker leadId={lead.id} current={lead.next_follow_up_at} />
-          <MeetingProposalActions leadId={lead.id} />
+          <MeetingProposalActions leadId={lead.id} proposalStatus={lead.proposal_status} />
           {lead.pipeline_stage ? (
             <StageMover leadId={lead.id} currentStage={lead.pipeline_stage} />
           ) : (

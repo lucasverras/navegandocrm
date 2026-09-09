@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { bulkPipelineActionSchema } from "@/lib/schemas";
+import type { Json } from "@/types/database";
 
 // Bulk lead operations from the Leads list — never sends messages, never calls
 // OpenAI or Google Places. Each affected lead gets an outreach_events entry.
@@ -19,11 +20,14 @@ export async function POST(req: NextRequest) {
 
   let update: Record<string, unknown> | null = null;
   let eventType = "";
-  let metadata: Record<string, unknown> = {};
+  let metadata: Json = {};
 
   switch (action) {
     case "move_stage":
       if (!parsed.data.stage) return NextResponse.json({ error: "Etapa não informada" }, { status: 400 });
+      if (parsed.data.stage === "closed") {
+        return NextResponse.json({ error: "Fechamentos exigem os dados do contrato" }, { status: 400 });
+      }
       update = { pipeline_stage: parsed.data.stage, stage_changed_at: now, last_activity_at: now };
       eventType = "stage_changed";
       metadata = { to: parsed.data.stage, bulk: true, changed_by: user.id };
@@ -43,7 +47,16 @@ export async function POST(req: NextRequest) {
       eventType = "archived";
       break;
     case "discard":
-      update = { business_status: "not_interested", last_activity_at: now };
+      update = {
+        business_status: "not_interested",
+        archived_at: now,
+        next_action_type: null,
+        next_action_at: null,
+        next_follow_up_at: null,
+        contact_round: null,
+        cadence_step: 0,
+        last_activity_at: now,
+      };
       eventType = "lead_discarded";
       break;
   }

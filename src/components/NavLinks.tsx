@@ -25,12 +25,12 @@ export interface NavItem {
   badge?: number;
 }
 
-export function NavLinks({ items, orientation = "vertical" }: { items: NavItem[]; orientation?: "vertical" | "horizontal" }) {
+export function NavLinks({ items, orientation = "vertical" }: { items: NavItem[]; orientation?: "vertical" | "horizontal" | "bottom" }) {
   const pathname = usePathname();
 
   return (
     <nav
-      className={cn("flex flex-1 gap-1", orientation === "vertical" ? "flex-col" : "flex-row")}
+      className={cn("flex flex-1 gap-1", orientation === "vertical" ? "flex-col" : "flex-row", orientation === "bottom" && "justify-around")}
       aria-label="Navegação principal"
     >
       {items.map((item) => {
@@ -43,15 +43,16 @@ export function NavLinks({ items, orientation = "vertical" }: { items: NavItem[]
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors",
+              orientation === "bottom" && "relative min-h-12 min-w-14 flex-col justify-center gap-0.5 px-1 py-1 text-[10px]",
               active
                 ? "bg-accent-soft text-accent-2"
                 : "text-muted hover:bg-surface-2 hover:text-foreground"
             )}
           >
-            <Icon className="h-4 w-4 shrink-0" />
+            <Icon className={cn("h-4 w-4 shrink-0", orientation === "bottom" && "h-5 w-5")} />
             <span className={orientation === "vertical" ? "flex-1" : ""}>{item.label}</span>
             {!!item.badge && (
-              <span className="rounded-full bg-danger/20 px-1.5 py-0.5 text-[11px] font-medium leading-none text-danger">
+              <span className={cn("rounded-full bg-danger/20 px-1.5 py-0.5 text-[11px] font-medium leading-none text-danger", orientation === "bottom" && "absolute right-1 top-0.5")}>
                 {item.badge}
               </span>
             )}

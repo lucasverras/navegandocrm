@@ -39,7 +39,70 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const admin = createAdminClient();
+  const { data: before } = await admin
+    .from("leads")
+    .select("closed_at, churned_at, current_monthly_fee, commission_type, commission_percent, commission_received")
+    .eq("id", id)
+    .maybeSingle();
+  if (!before) return NextResponse.json({ error: "Cliente não encontrado" }, { status: 404 });
   const { data, error } = await admin.from("leads").update(update).eq("id", id).select("id, name").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const now = new Date().toISOString();
+  const events: Array<Record<string, unknown>> = [];
+  const changed = (key: keyof typeof before) =>
+    key in parsed.data && parsed.data[key as keyof typeof parsed.data] !== before[key];
+  if (changed("current_monthly_fee")) {
+    events.push({
+      event_type: "fee_changed",
+      amount: parsed.data.current_monthly_fee ?? null,
+      effective_at: now,
+      metadata: { from: before.current_monthly_fee, to: parsed.data.current_monthly_fee ?? null },
+    });
+  }
+  if (changed("commission_type") || changed("commission_percent")) {
+    events.push({
+      event_type: "commission_rule_changed",
+      amount: null,
+      effective_at: now,
+      metadata: {
+        from: { type: before.commission_type, percent: before.commission_percent },
+        to: {
+          type: parsed.data.commission_type ?? before.commission_type,
+          percent: parsed.data.commission_percent ?? before.commission_percent,
+        },
+      },
+    });
+  }
+  if (changed("commission_received")) {
+    events.push({
+      event_type: "adjustment",
+      amount: (parsed.data.commission_received ?? 0) - (before.commission_received ?? 0),
+      effective_at: now,
+      note: "Ajuste manual da comissão recebida",
+      metadata: { from: before.commission_received, to: parsed.data.commission_received ?? null },
+    });
+  }
+  if (changed("closed_at") && parsed.data.closed_at) {
+    events.push({
+      event_type: "contract_started",
+      amount: parsed.data.current_monthly_fee ?? before.current_monthly_fee,
+      effective_at: parsed.data.closed_at,
+      metadata: { corrected: !!before.closed_at },
+    });
+  }
+  if (changed("churned_at")) {
+    events.push({
+      event_type: parsed.data.churned_at ? "contract_ended" : "contract_reactivated",
+      amount: null,
+      effective_at: parsed.data.churned_at ?? now,
+      metadata: { from: before.churned_at, to: parsed.data.churned_at ?? null },
+    });
+  }
+  if (events.length) {
+    await admin.from("client_finance_events").insert(
+      events.map((event) => ({ ...event, lead_id: id, created_by: user.id }))
+    );
+  }
   return NextResponse.json({ ok: true, lead: data });
 }

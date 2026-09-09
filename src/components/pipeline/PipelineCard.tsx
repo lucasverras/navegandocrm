@@ -61,7 +61,7 @@ export function PipelineCard({
   }
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
 
-  const iconBtn = "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 transition-colors active:scale-90";
+  const iconBtn = "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-surface-2 transition-colors active:scale-90 md:h-7 md:w-7";
 
   return (
     <div
@@ -152,7 +152,7 @@ export function PipelineCard({
                 setShowFollowUp(false);
                 onFollowUp(c.days);
               }}
-              className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-accent hover:text-accent-2"
+              className="min-h-10 rounded-full border border-border px-3 py-1 text-[11px] text-muted transition-colors hover:border-accent hover:text-accent-2 md:min-h-0 md:px-2 md:py-0.5"
             >
               {c.label}
             </button>
@@ -176,7 +176,7 @@ export function PipelineCard({
             </option>
           ))}
         </select>
-        <div className="ml-auto flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="ml-auto flex items-center gap-3 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           {onFollowUp && (
             <button
               type="button"
@@ -186,7 +186,7 @@ export function PipelineCard({
                 e.stopPropagation();
                 setShowFollowUp((v) => !v);
               }}
-              className="text-[11px] text-muted hover:text-accent-2"
+              className="min-h-10 text-[11px] text-muted hover:text-accent-2 md:min-h-0"
             >
               Follow-up
             </button>
@@ -199,7 +199,7 @@ export function PipelineCard({
               e.stopPropagation();
               onLose();
             }}
-            className="text-[11px] text-muted hover:text-danger"
+            className="min-h-10 text-[11px] text-muted hover:text-danger md:min-h-0"
           >
             Perder
           </button>

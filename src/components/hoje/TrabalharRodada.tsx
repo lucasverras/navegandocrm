@@ -24,6 +24,7 @@ export function TrabalharRodada({ round }: { round: ContactRound }) {
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [outcomeNote, setOutcomeNote] = useState("");
 
   const label = CONTACT_ROUND_LABELS[round];
 
@@ -41,43 +42,66 @@ export function TrabalharRodada({ round }: { round: ContactRound }) {
   const current = index < total ? leads[index] : null;
 
   function next() {
+    setOutcomeNote("");
     setIndex((i) => i + 1);
+  }
+
+  async function assertOk(res: Response | null, fallback: string) {
+    if (res?.ok) return res;
+    const data = res ? await res.json().catch(() => null) : null;
+    throw new Error(data?.error ?? fallback);
   }
 
   async function markSentAndAdvance() {
     if (!current || busy) return;
     setBusy(true);
-    await fetch(`/api/leads/${current.id}/status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "message_sent" }),
-    }).catch(() => null);
-    setBusy(false);
-    toast.success("Mensagem marcada como enviada");
+    try {
+      const res = await fetch(`/api/leads/${current.id}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "message_sent" }),
+      }).catch(() => null);
+      await assertOk(res, "Não foi possível marcar a mensagem como enviada");
+      toast.success("Mensagem marcada como enviada");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível marcar a mensagem como enviada");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function response(kind: string) {
     if (!current || busy) return;
     setBusy(true);
-    await fetch(`/api/leads/${current.id}/response`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ response: kind }),
-    }).catch(() => null);
-    setBusy(false);
-    next();
-    // No refresh while the fullscreen modal is open — the index already advanced.
+    try {
+      const res = await fetch(`/api/leads/${current.id}/response`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: kind, note: outcomeNote.trim() || undefined }),
+      }).catch(() => null);
+      await assertOk(res, "Não foi possível registrar o resultado");
+      next();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível registrar o resultado");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function cadence() {
     if (!current || busy) return;
     setBusy(true);
-    const res = await fetch(`/api/leads/${current.id}/cadence`, { method: "PATCH" }).catch(() => null);
-    const data = res?.ok ? await res.json().catch(() => null) : null;
-    setBusy(false);
-    toast.success(data?.days ? `Próxima rodada em ${data.days} dias` : "Avançado");
-    next();
-    // No refresh while the fullscreen modal is open — the index already advanced.
+    try {
+      const res = await fetch(`/api/leads/${current.id}/cadence`, { method: "PATCH" }).catch(() => null);
+      await assertOk(res, "Não foi possível avançar a rodada");
+      const data = await res!.json().catch(() => null);
+      toast.success(data?.days ? `Próxima rodada em ${data.days} dias` : "Avançado");
+      next();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível avançar a rodada");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function copyMessage() {
@@ -221,6 +245,12 @@ export function TrabalharRodada({ round }: { round: ContactRound }) {
                 {/* Results (§27) */}
                 <div>
                   <p className="mb-2 text-xs uppercase tracking-wide text-muted">O que aconteceu?</p>
+                  <textarea
+                    value={outcomeNote}
+                    onChange={(e) => setOutcomeNote(e.target.value)}
+                    placeholder="Resposta, objeção ou próximo passo (opcional)"
+                    className="mb-2 min-h-20 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
+                  />
                   <div className="grid grid-cols-2 gap-2">
                     <ResultBtn onClick={cadence} disabled={busy}>Sem resposta</ResultBtn>
                     <ResultBtn onClick={() => response("respondeu")} disabled={busy}>Respondeu</ResultBtn>

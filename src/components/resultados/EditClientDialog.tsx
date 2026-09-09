@@ -51,12 +51,12 @@ export function EditClientDialog({ client }: { client: ClientData }) {
       current_monthly_fee: form.current_monthly_fee || null,
       commission_type: form.commission_type,
       commission_percent: form.commission_percent || null,
-      commission_received: form.commission_received || null,
-      legacy_months_paid: form.legacy_months_paid || null,
+      commission_received: form.commission_received,
+      legacy_months_paid: form.legacy_months_paid,
       first_payment_paid: form.first_payment_paid,
       closed_note: form.closed_note || null,
     };
-    if (form.closed_at) body.closed_at = new Date(form.closed_at + "T12:00:00Z").toISOString();
+    body.closed_at = form.closed_at ? new Date(form.closed_at + "T12:00:00Z").toISOString() : null;
     if (form.churned_at) body.churned_at = new Date(form.churned_at + "T12:00:00Z").toISOString();
     else body.churned_at = null;
 
@@ -90,16 +90,19 @@ export function EditClientDialog({ client }: { client: ClientData }) {
 
       {open && (
         <div
-          className="animate-fade-in fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[8vh]"
+          className="animate-fade-in fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-start sm:p-4 sm:pt-[8vh]"
           onClick={() => setOpen(false)}
         >
           <div
-            className="animate-scale-in w-full max-w-lg overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`edit-client-${client.id}`}
+            className="animate-scale-in max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-xl border border-border bg-surface shadow-2xl sm:rounded-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
-              <h2 className="font-display text-lg font-bold text-foreground">Editar {client.name}</h2>
-              <button type="button" onClick={() => setOpen(false)} className="text-muted hover:text-foreground">
+              <h2 id={`edit-client-${client.id}`} className="font-display text-lg font-bold text-foreground">Editar {client.name}</h2>
+              <button type="button" aria-label="Fechar" onClick={() => setOpen(false)} className="text-muted hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -110,7 +113,7 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                 <input className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Data início</label>
                   <input type="date" className={inputClass} value={form.closed_at} onChange={(e) => set("closed_at", e.target.value)} />
@@ -121,7 +124,7 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Mensalidade inicial</label>
                   <input type="number" className={inputClass} value={form.initial_monthly_fee} onChange={(e) => set("initial_monthly_fee", Number(e.target.value))} />
@@ -132,7 +135,7 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label className={labelClass}>Regra comissão</label>
                   <select className={inputClass} value={form.commission_type} onChange={(e) => set("commission_type", e.target.value)}>
@@ -152,7 +155,7 @@ export function EditClientDialog({ client }: { client: ClientData }) {
               </div>
 
               {form.commission_type === "legacy_recurring" && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>Meses pagos (legado)</label>
                     <input type="number" className={inputClass} value={form.legacy_months_paid} onChange={(e) => set("legacy_months_paid", Number(e.target.value))} />

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { z } from "zod";
 
 // Quick response registration (brief §RESPOSTAS): one tap records what happened in the
 // conversation and safely auto-adjusts commercial_status, pipeline stage and follow-up.
@@ -14,6 +15,23 @@ type ResponseKind =
   | "reuniao"
   | "contato_errado"
   | "nao_interessado";
+
+const responseSchema = z.object({
+  response: z.enum([
+    "respondeu",
+    "interessado",
+    "apresentacao",
+    "agencia",
+    "depois",
+    "reuniao",
+    "contato_errado",
+    "nao_interessado",
+  ]),
+  note: z.string().max(2000).optional(),
+  decision_maker_name: z.string().max(200).optional(),
+  decision_maker_role: z.string().max(120).optional(),
+  decision_maker_phone: z.string().max(40).optional(),
+});
 
 const RESPONSES: Record<
   ResponseKind,
@@ -41,8 +59,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
   const { id: leadId } = await params;
-  const body = await req.json().catch(() => ({}));
-  const kind = body?.response as ResponseKind;
+  const parsed = responseSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Resposta inválida" }, { status: 400 });
+  const kind = parsed.data.response as ResponseKind;
   const rule = RESPONSES[kind];
   if (!rule) return NextResponse.json({ error: "Resposta inválida" }, { status: 400 });
 
@@ -67,13 +86,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Next action ("qual é o próximo passo?") — kept in sync with every registered outcome.
   if (kind === "reuniao") {
     update.next_action_type = "meeting";
-    update.next_action_at = null; // until the meeting time is captured
+    update.next_action_at = now; // remains visible until the meeting time is captured
   } else if (kind === "contato_errado") {
     update.next_action_type = "call_decisor";
-    update.next_action_at = null;
+    update.next_action_at = now;
   } else if (rule.lost) {
     update.next_action_type = null;
     update.next_action_at = null;
+    update.next_follow_up_at = null;
+    update.archived_at = now;
   } else if (rule.followUpDays != null) {
     update.next_action_type = "follow_up";
     update.next_action_at = update.next_follow_up_at;
@@ -92,8 +113,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     lead_id: leadId,
     event_type: `response_${kind}`,
     channel: "whatsapp",
-    metadata: { by: user.id },
+    metadata: { by: user.id, note: parsed.data.note?.trim() || null },
   });
+
+  if (parsed.data.decision_maker_name?.trim()) {
+    await admin.from("decision_makers").insert({
+      lead_id: leadId,
+      name: parsed.data.decision_maker_name.trim(),
+      role: parsed.data.decision_maker_role?.trim() || null,
+      phone: parsed.data.decision_maker_phone?.trim() || null,
+      contact_type: parsed.data.decision_maker_phone ? "phone" : "manual",
+      confidence: 1,
+      found: true,
+      researched_at: now,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

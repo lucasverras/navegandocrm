@@ -13,6 +13,11 @@ export interface ClientFinance {
   first_payment_paid: boolean;
   legacy_months_paid: number;
   commission_received: number;
+  finance_events?: {
+    event_type: string;
+    amount: number | null;
+    effective_at: string;
+  }[];
 }
 
 // Inclusive count of calendar months between two dates. Jul → Nov = 5.
@@ -28,13 +33,35 @@ export function isActive(c: Pick<ClientFinance, "churned_at">): boolean {
   return !c.churned_at;
 }
 
-// Contractual revenue the client generated for Navegando: months active × monthly fee.
-// Active clients count up to the current month. Uses current fee, falling back to initial.
+function monthKey(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+// Contractual revenue month by month. Fee changes affect their effective month onward,
+// so editing today's fee never rewrites the revenue of earlier months.
 export function receitaGerada(c: ClientFinance, now: Date = new Date()): number {
   if (!c.closed_at) return 0;
-  const monthly = c.current_monthly_fee ?? c.initial_monthly_fee ?? 0;
-  const end = c.churned_at ?? now.toISOString();
-  return monthsBetween(c.closed_at, end) * monthly;
+  const start = new Date(c.closed_at);
+  const end = new Date(c.churned_at ?? now.toISOString());
+  let cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+  const endMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1));
+  let monthly = c.initial_monthly_fee ?? c.current_monthly_fee ?? 0;
+  let revenue = 0;
+  const changes = (c.finance_events ?? [])
+    .filter((event) => event.event_type === "fee_changed" && event.amount != null)
+    .sort((a, b) => a.effective_at.localeCompare(b.effective_at));
+  let changeIndex = 0;
+
+  while (cursor <= endMonth) {
+    const currentMonth = monthKey(cursor);
+    while (changes[changeIndex] && changes[changeIndex].effective_at.slice(0, 7) <= currentMonth) {
+      monthly = changes[changeIndex].amount ?? monthly;
+      changeIndex += 1;
+    }
+    revenue += monthly;
+    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+  }
+  return revenue;
 }
 
 // Commission the client has GENERATED so far. Base is ALWAYS the initial monthly fee.
