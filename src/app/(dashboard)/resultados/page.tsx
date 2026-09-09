@@ -19,14 +19,19 @@ import {
   reimbursementTotals,
   type ClientFinance,
 } from "@/lib/finance";
-import { formatDateOnly } from "@/lib/utils";
 import { Wallet } from "lucide-react";
 
 type Tab = "overview" | "fechados" | "comissoes" | "reembolsos" | "analytics";
-type ClientRow = ClientFinance & { id: string; name: string; lead_origin: string; regions: { neighborhood: string } | null };
+type ClientRow = ClientFinance & {
+  id: string;
+  name: string;
+  lead_origin: string;
+  closed_note: string | null;
+  regions: { neighborhood: string } | null;
+};
 
 const FIELDS =
-  "id, name, closed_at, churned_at, initial_monthly_fee, current_monthly_fee, commission_type, commission_percent, first_payment_paid, legacy_months_paid, commission_received, lead_origin, regions(neighborhood)";
+  "id, name, closed_at, churned_at, initial_monthly_fee, current_monthly_fee, commission_type, commission_percent, first_payment_paid, legacy_months_paid, commission_received, lead_origin, closed_note, regions(neighborhood)";
 
 export default async function ResultadosPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const { tab: tabRaw } = await searchParams;
@@ -92,63 +97,46 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
       </div>
 
       {tab === "overview" && (
-        <div className="flex flex-col gap-8">
-          {/* Hero — the three numbers that matter most, editorial not boxed. */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            <Hero label="Receita gerada p/ Navegando" value={BRL.format(receita)} />
-            <Hero label="MRR que você trouxe" value={BRL.format(mrr)} accent />
-            <Hero label="Total a receber" value={BRL.format(totalReceber)} accent />
-          </div>
-          {/* Secondary — compact, divided, no boxes. */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-5 border-t border-border pt-6 sm:grid-cols-4">
-            <Mini label="Clientes que trouxe" value={String(clients.length)} />
-            <Mini label="Ativos" value={String(activeCount)} />
-            <Mini label="Ticket médio" value={BRL.format(ticket)} />
-            <Mini label="Fechamentos no mês" value={String(fechamentosMes)} />
-            <Mini label="Comissões geradas" value={BRL.format(comGerada)} />
-            <Mini label="Comissões recebidas" value={BRL.format(comRecebida)} />
-            <Mini label="Comissões pendentes" value={BRL.format(comPendente)} />
-            <Mini label="Reembolsos pendentes" value={BRL.format(reembT.pending)} />
+        <div className="flex flex-col gap-6">
+          {/* Dense control strip (§53-54): no giant numbers, just readable data. */}
+          <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+            <KPI label="Clientes trazidos" value={String(clients.length)} />
+            <KPI label="Ativos" value={String(activeCount)} />
+            <KPI label="MRR trazido" value={BRL.format(mrr)} accent />
+            <KPI label="Receita gerada" value={BRL.format(receita)} />
+            <KPI label="Comissão gerada" value={BRL.format(comGerada)} />
+            <KPI label="Comissão recebida" value={BRL.format(comRecebida)} />
+            <KPI label="A receber" value={BRL.format(totalReceber)} accent={totalReceber > 0} />
+            {reembT.pending > 0 && <KPI label="Reembolsos" value={BRL.format(reembT.pending)} accent />}
           </div>
 
-          {/* Clientes fechados — a quick list right on the overview, so the numbers above have
-              faces behind them. Full detail + edição fica na aba "Fechados". */}
-          {clients.length > 0 && (
-            <div className="border-t border-border pt-6">
-              <div className="mb-2 flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold text-foreground">Clientes fechados</h2>
-                {clients.length > 8 && (
-                  <Link href="/resultados?tab=fechados" className="text-xs text-muted transition-colors hover:text-foreground">
-                    Ver todos ({clients.length})
-                  </Link>
-                )}
-              </div>
-              <ul className="flex flex-col">
-                {clients.slice(0, 8).map((c) => {
-                  const active = isActive(c);
-                  const fee = c.current_monthly_fee ?? c.initial_monthly_fee ?? 0;
-                  return (
-                    <li key={c.id} className="flex items-center justify-between gap-4 border-b border-border/70 py-2.5 last:border-b-0">
-                      <div className="min-w-0">
-                        <Link href={`/leads/${c.id}`} className="text-sm font-medium text-foreground transition-colors hover:text-accent-2">
-                          {c.name}
-                        </Link>
-                        <p className="truncate text-xs text-muted">
-                          {c.region ?? "Sem região"} · desde {c.closed_at ? formatDateOnly(c.closed_at) : "—"}
-                          {fee > 0 && ` · ${BRL.format(fee)}/mês`}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-5">
-                        <span className="tabular-nums text-sm font-semibold text-foreground">{BRL.format(receitaGerada(c, now))}</span>
-                        <span className={`w-16 text-right text-xs ${active ? "text-success" : "text-muted"}`}>
-                          {active ? "Ativo" : "Encerrado"}
-                        </span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+          {/* Full fechados table as main content (§55) — the same table as the tab,
+              with per-client comissão gerada/recebida/pendente + edit button. */}
+          {clients.length === 0 ? (
+            <Empty />
+          ) : (
+            <Table>
+              <THead>
+                <Tr>
+                  <Th>Cliente</Th>
+                  <Th>Entrou</Th>
+                  <Th>Saiu</Th>
+                  <Th>Meses</Th>
+                  <Th>Mensalidade</Th>
+                  <Th>Receita Nav.</Th>
+                  <Th>Comissão</Th>
+                  <Th>Recebida</Th>
+                  <Th>Pendente</Th>
+                  <Th>Status</Th>
+                  <Th></Th>
+                </Tr>
+              </THead>
+              <TBody>
+                {clients.map((c) => (
+                  <FechadoRow key={c.id} client={c as Fechado} />
+                ))}
+              </TBody>
+            </Table>
           )}
         </div>
       )}
@@ -163,11 +151,13 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
                 <Th>Cliente</Th>
                 <Th>Entrou</Th>
                 <Th>Saiu</Th>
-                <Th>Tempo ativo</Th>
+                <Th>Meses</Th>
                 <Th>Mensalidade</Th>
+                <Th>Receita Nav.</Th>
+                <Th>Comissão</Th>
+                <Th>Recebida</Th>
+                <Th>Pendente</Th>
                 <Th>Status</Th>
-                <Th>Receita acumulada</Th>
-                <Th>Região</Th>
                 <Th></Th>
               </Tr>
             </THead>
@@ -211,22 +201,11 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
   );
 }
 
-function Hero({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function KPI({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div>
-      <p className={`font-display text-[34px] font-extrabold leading-none tracking-tight tabular-nums ${accent ? "text-accent-2" : "text-foreground"}`}>
-        {value}
-      </p>
-      <p className="mt-2 text-xs uppercase tracking-wide text-muted">{label}</p>
-    </div>
-  );
-}
-
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="font-display text-lg font-bold tabular-nums text-foreground">{value}</p>
-      <p className="mt-0.5 text-xs text-muted">{label}</p>
+      <p className={`font-display text-base font-bold tabular-nums ${accent ? "text-accent-2" : "text-foreground"}`}>{value}</p>
+      <p className="text-[11px] text-muted">{label}</p>
     </div>
   );
 }

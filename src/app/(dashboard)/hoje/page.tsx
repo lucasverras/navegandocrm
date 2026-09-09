@@ -2,47 +2,20 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TrabalharFila, type FilaDemand } from "@/components/hoje/TrabalharFila";
 import { DemandRow } from "@/components/hoje/DemandRow";
+import { ChecklistPanel } from "@/components/hoje/ChecklistPanel";
 import { BRL } from "@/lib/finance";
 import {
   DEMAND_SELECT,
   actionLine,
   bucketOf,
   spTodayStart,
-  spTodayStartInstant,
   type Demand,
   type DemandBucket,
 } from "@/components/hoje/demand";
+import { CONTACT_ROUND_LABELS, type ContactRound } from "@/types/domain";
 import type { OutreachMessageRow } from "@/types/database";
 
-type Filter = "todas" | "atrasadas" | "hoje" | "amanha" | "semana" | "sem-data" | "concluidas";
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "todas", label: "Todas" },
-  { key: "atrasadas", label: "Atrasadas" },
-  { key: "hoje", label: "Hoje" },
-  { key: "amanha", label: "Amanhã" },
-  { key: "semana", label: "Próximos 7 dias" },
-  { key: "sem-data", label: "Sem data" },
-  { key: "concluidas", label: "Concluídas" },
-];
-
-const DONE_LABELS: Record<string, string> = {
-  cadence_followup: "Sem resposta — próximo follow-up agendado",
-  follow_up_set: "Follow-up agendado",
-  meeting_scheduled: "Reunião marcada",
-  proposal_sent: "Proposta enviada",
-  closed_won: "Negócio fechado",
-  message_sent: "Mensagem enviada",
-  response_respondeu: "Respondeu",
-  response_interessado: "Interessado",
-  response_apresentacao: "Mandar apresentação",
-  response_agencia: "Já tem agência",
-  response_depois: "Falar depois",
-  response_reuniao: "Pediu reunião",
-  response_contato_errado: "Contato errado",
-  response_nao_interessado: "Não interessado",
-};
-
-const DONE_TIME = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+// V7 §16-17: Hoje = CHECKLISTS + RODADAS + DEMANDAS. Não é post-it, não é dashboard de KPI.
 
 function greeting(): string {
   const h = new Date().toLocaleString("pt-BR", { hour: "numeric", hour12: false, timeZone: "America/Sao_Paulo" });
@@ -59,59 +32,76 @@ const DATE_FMT = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 
-export default async function HojePage({ searchParams }: { searchParams: Promise<{ f?: string }> }) {
-  const { f: fRaw } = await searchParams;
-  const filter = (FILTERS.some((c) => c.key === fRaw) ? fRaw : null) as Filter | null;
-
+export default async function HojePage() {
   const supabase = await createClient();
   const now = new Date();
   const todayStart = spTodayStart(now);
 
-  // Main data + summary counts in parallel — one round-trip batch.
-  const [{ data: demandsRaw }, { count: pipelineCount }, { count: prospectCount }, { data: reimbRaw }] =
-    await Promise.all([
-      supabase
-        .from("leads")
-        .select(DEMAND_SELECT)
-        .is("archived_at", null)
-        .not("next_action_type", "is", null)
-        .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
-        .order("next_action_at", { ascending: true, nullsFirst: false })
-        .limit(300),
-      supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .is("archived_at", null)
-        .not("pipeline_stage", "is", null)
-        .neq("pipeline_stage", "closed"),
-      supabase
-        .from("leads")
-        .select("id", { count: "exact", head: true })
-        .eq("triage_status", "pending_review"),
-      supabase
-        .from("reimbursements")
-        .select("amount, amount_received, status")
-        .eq("status", "pending"),
-    ]);
+  // All queries in parallel — single round-trip batch.
+  const [
+    { data: demandsRaw },
+    { data: roundsRaw },
+    { data: checkPending },
+    { data: checkDone },
+    { data: reimbRaw },
+  ] = await Promise.all([
+    // Demandas específicas (com data: reunião, cobrar proposta, chamar dia X).
+    supabase
+      .from("leads")
+      .select(DEMAND_SELECT)
+      .is("archived_at", null)
+      .not("next_action_type", "is", null)
+      .not("next_action_at", "is", null)
+      .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
+      .order("next_action_at", { ascending: true, nullsFirst: false })
+      .limit(200),
+    // Rodadas: leads agrupados por contact_round.
+    supabase
+      .from("leads")
+      .select("id, contact_round")
+      .is("archived_at", null)
+      .not("contact_round", "is", null)
+      .or("pipeline_stage.is.null,pipeline_stage.neq.closed"),
+    // Checklists.
+    supabase
+      .from("checklists")
+      .select("id, text, lead_id, amount, due_at, type, completed_at, created_at, leads(name)")
+      .is("completed_at", null)
+      .order("created_at", { ascending: true })
+      .limit(50),
+    supabase
+      .from("checklists")
+      .select("id, text, lead_id, amount, type, completed_at, leads(name)")
+      .not("completed_at", "is", null)
+      .order("completed_at", { ascending: false })
+      .limit(20),
+    // Reembolsos pendentes.
+    supabase
+      .from("reimbursements")
+      .select("id, description, amount, amount_received, status")
+      .eq("status", "pending"),
+  ]);
 
   const demands = (demandsRaw ?? []) as unknown as Demand[];
-  const reimbPending = ((reimbRaw ?? []) as { amount: number; amount_received: number; status: string }[]).reduce(
-    (s, r) => s + (r.amount - (r.amount_received ?? 0)),
-    0
-  );
+  const rounds = (roundsRaw ?? []) as { id: string; contact_round: ContactRound }[];
 
+  // Bucketize dated demands.
   const buckets: Record<DemandBucket, Demand[]> = {
-    atrasadas: [],
-    hoje: [],
-    amanha: [],
-    semana: [],
-    depois: [],
-    "sem-data": [],
+    atrasadas: [], hoje: [], amanha: [], semana: [], depois: [], "sem-data": [],
   };
   for (const d of demands) buckets[bucketOf(d, todayStart)].push(d);
 
-  const filaDemands = [...buckets.atrasadas, ...buckets.hoje, ...buckets["sem-data"]];
+  // Rounds summary.
+  const roundCounts: Record<ContactRound, number> = {
+    FIRST_CONTACT: 0, FOLLOW_UP_1: 0, FOLLOW_UP_2: 0, FOLLOW_UP_3: 0,
+  };
+  for (const r of rounds) {
+    if (r.contact_round in roundCounts) roundCounts[r.contact_round]++;
+  }
+  const totalRounds = Object.values(roundCounts).reduce((a, b) => a + b, 0);
 
+  // Fila de trabalho: atrasadas → hoje → primeira abordagem (sem data).
+  const filaDemands = [...buckets.atrasadas, ...buckets.hoje];
   const latestMessageByLead = new Map<string, string>();
   if (filaDemands.length > 0) {
     const { data: messages } = await supabase
@@ -119,7 +109,7 @@ export default async function HojePage({ searchParams }: { searchParams: Promise
       .select("lead_id, content, created_at")
       .in("lead_id", filaDemands.map((d) => d.id))
       .order("created_at", { ascending: false })
-      .limit(300);
+      .limit(200);
     for (const msg of (messages ?? []) as Pick<OutreachMessageRow, "lead_id" | "content" | "created_at">[]) {
       if (!latestMessageByLead.has(msg.lead_id)) latestMessageByLead.set(msg.lead_id, msg.content);
     }
@@ -140,77 +130,17 @@ export default async function HojePage({ searchParams }: { searchParams: Promise
     message: latestMessageByLead.get(d.id) ?? null,
   }));
 
-  let done: { id: string; name: string; label: string; at: string }[] = [];
-  if (filter === "concluidas") {
-    const { data: events } = await supabase
-      .from("outreach_events")
-      .select("id, event_type, created_at, leads(name)")
-      .gte("created_at", spTodayStartInstant(now).toISOString())
-      .in("event_type", Object.keys(DONE_LABELS))
-      .order("created_at", { ascending: false })
-      .limit(100);
-    done = ((events ?? []) as unknown as { id: string; event_type: string; created_at: string; leads: { name: string } | null }[]).map(
-      (e) => ({
-        id: e.id,
-        name: e.leads?.name ?? "—",
-        label: DONE_LABELS[e.event_type] ?? e.event_type,
-        at: e.created_at,
-      })
-    );
-  }
+  // Reembolsos pendentes.
+  const reimbs = (reimbRaw ?? []) as { id: string; description: string; amount: number; amount_received: number; status: string }[];
+  const reimbTotal = reimbs.reduce((s, r) => s + (r.amount - (r.amount_received ?? 0)), 0);
 
-  const counts: Record<Filter, number> = {
-    todas: demands.length,
-    atrasadas: buckets.atrasadas.length,
-    hoje: buckets.hoje.length,
-    amanha: buckets.amanha.length,
-    semana: buckets.semana.length,
-    "sem-data": buckets["sem-data"].length,
-    concluidas: done.length,
-  };
-
-  const urgentCount = buckets.atrasadas.length + buckets.hoje.length;
-
-  // Card data
-  const cards: { label: string; value: string; href: string; accent?: boolean; danger?: boolean }[] = [
-    {
-      label: "A resolver hoje",
-      value: String(urgentCount),
-      href: "/hoje?f=hoje",
-      danger: buckets.atrasadas.length > 0,
-      accent: urgentCount > 0 && buckets.atrasadas.length === 0,
-    },
-    {
-      label: "Leads no pipeline",
-      value: String(pipelineCount ?? 0),
-      href: "/pipeline",
-    },
-    {
-      label: "Primeira abordagem",
-      value: String(buckets["sem-data"].length),
-      href: "/hoje?f=sem-data",
-      accent: buckets["sem-data"].length > 0,
-    },
-    {
-      label: "A prospectar",
-      value: String(prospectCount ?? 0),
-      href: "/prospeccao",
-    },
-  ];
-
-  // Only show reimbursement card if there's something pending
-  if (reimbPending > 0) {
-    cards.push({
-      label: "Reembolsos pendentes",
-      value: BRL.format(reimbPending),
-      href: "/resultados?tab=reembolsos",
-      accent: true,
-    });
-  }
+  // Demandas urgentes (atrasadas + hoje).
+  const urgentDemands = [...buckets.atrasadas, ...buckets.hoje];
+  const futureDemands = [...buckets.amanha, ...buckets.semana];
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Greeting + date */}
+      {/* Greeting */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-[28px] font-extrabold leading-tight tracking-tight text-foreground">
@@ -218,193 +148,150 @@ export default async function HojePage({ searchParams }: { searchParams: Promise
           </h1>
           <p className="mt-0.5 text-sm capitalize text-muted">{DATE_FMT.format(now)}</p>
         </div>
-        <TrabalharFila demands={fila} />
+        {fila.length > 0 && <TrabalharFila demands={fila} />}
       </div>
 
-      {/* Dashboard cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {cards.map((c) => (
-          <Link
-            key={c.label}
-            href={c.href}
-            className="group flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all hover:border-accent/50 hover:shadow-md"
-          >
-            <span
-              className={`font-display text-2xl font-bold tabular-nums ${
-                c.danger ? "text-danger" : c.accent ? "text-accent-2" : "text-foreground"
-              }`}
-            >
-              {c.value}
-            </span>
-            <span className="text-xs text-muted group-hover:text-foreground">{c.label}</span>
-          </Link>
-        ))}
-      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+        {/* LEFT COLUMN — Checklists + Rounds + Demandas */}
+        <div className="flex flex-col gap-6">
+          {/* Checklists (§18-21) */}
+          <HomeSection title="Checklists">
+            <ChecklistPanel
+              initialPending={(checkPending ?? []) as unknown as Parameters<typeof ChecklistPanel>[0]["initialPending"]}
+              initialDone={(checkDone ?? []) as unknown as Parameters<typeof ChecklistPanel>[0]["initialDone"]}
+            />
+          </HomeSection>
 
-      {/* Filter chips */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {FILTERS.map((c) => {
-          const active = filter === c.key;
-          const count = c.key === "concluidas" && filter !== "concluidas" ? null : counts[c.key];
-          return (
-            <Link
-              key={c.key}
-              href={active ? "/hoje" : `/hoje?f=${c.key}`}
-              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                active
-                  ? "border-accent bg-accent-soft font-medium text-accent-2"
-                  : "border-border text-muted hover:border-accent/50 hover:text-foreground"
-              }`}
-            >
-              {c.label}
-              {count != null && count > 0 && <span className="ml-1 tabular-nums opacity-70">{count}</span>}
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Content */}
-      {filter === "concluidas" ? (
-        <Section title="Concluídas hoje" count={done.length}>
-          {done.length === 0 ? (
-            <p className="py-2 text-sm text-muted">Nada registrado hoje ainda.</p>
-          ) : (
-            <ul className="flex flex-col">
-              {done.map((e) => (
-                <li key={e.id} className="flex items-center justify-between gap-3 border-b border-border/70 py-2 last:border-b-0">
-                  <p className="min-w-0 truncate text-sm">
-                    <span className="font-medium text-foreground">{e.name}</span>
-                    <span className="text-muted"> — {e.label}</span>
-                  </p>
-                  <span className="shrink-0 text-xs tabular-nums text-muted">{DONE_TIME.format(new Date(e.at))}</span>
-                </li>
-              ))}
-            </ul>
+          {/* Rodadas de contato (§22-27) */}
+          {totalRounds > 0 && (
+            <HomeSection title="Rodadas de contato">
+              <div className="flex flex-col gap-1">
+                {(Object.entries(roundCounts) as [ContactRound, number][])
+                  .filter(([, count]) => count > 0)
+                  .map(([round, count]) => (
+                    <Link
+                      key={round}
+                      href={`/pipeline?round=${round}`}
+                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm transition-colors hover:bg-surface-2"
+                    >
+                      <span className="text-foreground">{CONTACT_ROUND_LABELS[round]}</span>
+                      <span className="tabular-nums text-muted">
+                        {count} pendente{count > 1 ? "s" : ""}
+                      </span>
+                    </Link>
+                  ))}
+              </div>
+            </HomeSection>
           )}
-        </Section>
-      ) : filter ? (
-        <FilteredList filter={filter} buckets={buckets} todayStart={todayStart} messages={latestMessageByLead} />
-      ) : (
-        <PostIt buckets={buckets} todayStart={todayStart} messages={latestMessageByLead} />
-      )}
+
+          {/* Demandas específicas — leads com compromisso de data */}
+          {urgentDemands.length > 0 && (
+            <HomeSection title={buckets.atrasadas.length > 0 ? "Demandas urgentes" : "Demandas de hoje"}>
+              <ul className="flex flex-col">
+                {urgentDemands.map((d) => (
+                  <DemandRow key={d.id} demand={d} todayStart={todayStart} message={latestMessageByLead.get(d.id)} />
+                ))}
+              </ul>
+            </HomeSection>
+          )}
+
+          {futureDemands.length > 0 && (
+            <HomeSection title="Próximos dias">
+              <ul className="flex flex-col">
+                {futureDemands.map((d) => (
+                  <DemandRow key={d.id} demand={d} todayStart={todayStart} message={latestMessageByLead.get(d.id)} />
+                ))}
+              </ul>
+            </HomeSection>
+          )}
+
+          {/* Empty state */}
+          {urgentDemands.length === 0 && futureDemands.length === 0 && totalRounds === 0 && (
+            <div className="py-4">
+              <p className="text-sm text-muted">Nenhuma demanda pendente.</p>
+              <Link
+                href="/prospeccao"
+                className="mt-2 inline-block rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-2"
+              >
+                Prospectar novos restaurantes
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT COLUMN — Summary strip + Reembolsos */}
+        <div className="flex flex-col gap-6">
+          {/* Quick stats strip */}
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Atrasados" value={buckets.atrasadas.length} href="/hoje" danger={buckets.atrasadas.length > 0} />
+            <StatCard label="Rodadas" value={totalRounds} href="/pipeline" />
+            <StatCard label="Hoje" value={buckets.hoje.length} href="/hoje" accent={buckets.hoje.length > 0} />
+            <StatCard label="Próximos" value={futureDemands.length} href="/hoje" />
+          </div>
+
+          {/* Reembolsos pendentes (§21/§61) */}
+          {reimbs.length > 0 && (
+            <HomeSection title="Reembolsos pendentes">
+              <ul className="flex flex-col">
+                {reimbs.map((r) => {
+                  const pending = r.amount - (r.amount_received ?? 0);
+                  return (
+                    <li key={r.id} className="flex items-center justify-between border-b border-border/60 py-2 last:border-b-0">
+                      <span className="truncate text-sm text-foreground">{r.description}</span>
+                      <span className="shrink-0 text-sm font-medium tabular-nums text-accent-2">{BRL.format(pending)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-sm">
+                <span className="text-muted">Total</span>
+                <Link href="/resultados?tab=reembolsos" className="font-semibold tabular-nums text-accent-2 hover:underline">
+                  {BRL.format(reimbTotal)}
+                </Link>
+              </div>
+            </HomeSection>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function Section({ title, count, tone, children }: { title: string; count: number; tone?: "danger"; children: React.ReactNode }) {
+function HomeSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
-      <div className="flex items-baseline justify-between border-b border-border pb-1.5">
-        <h2 className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{title}</h2>
-        <span className={`text-xs font-semibold tabular-nums ${tone === "danger" && count > 0 ? "text-danger" : "text-muted"}`}>{count}</span>
-      </div>
+    <section className="rounded-xl border border-border bg-surface p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{title}</h2>
       {children}
     </section>
   );
 }
 
-function DemandList({ items, todayStart, messages }: { items: Demand[]; todayStart: Date; messages: Map<string, string> }) {
-  return (
-    <ul className="flex flex-col">
-      {items.map((d) => (
-        <DemandRow key={d.id} demand={d} todayStart={todayStart} message={messages.get(d.id)} />
-      ))}
-    </ul>
-  );
-}
-
-function PostIt({
-  buckets,
-  todayStart,
-  messages,
+function StatCard({
+  label,
+  value,
+  href,
+  danger,
+  accent,
 }: {
-  buckets: Record<DemandBucket, Demand[]>;
-  todayStart: Date;
-  messages: Map<string, string>;
+  label: string;
+  value: number;
+  href: string;
+  danger?: boolean;
+  accent?: boolean;
 }) {
-  const proximos = [...buckets.amanha, ...buckets.semana];
-  const nothing = buckets.atrasadas.length === 0 && buckets.hoje.length === 0 && proximos.length === 0 && buckets["sem-data"].length === 0;
-
-  if (nothing) {
-    return (
-      <div className="flex flex-col items-start gap-3 py-4">
-        <p className="text-sm text-muted">Nada pendente. Post-it limpo.</p>
-        <Link
-          href="/prospeccao"
-          className="rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-2"
-        >
-          Prospectar novos restaurantes
-        </Link>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      {buckets.atrasadas.length > 0 && (
-        <Section title="Atrasados" count={buckets.atrasadas.length} tone="danger">
-          <DemandList items={buckets.atrasadas} todayStart={todayStart} messages={messages} />
-        </Section>
-      )}
-      {buckets.hoje.length > 0 && (
-        <Section title="Hoje" count={buckets.hoje.length}>
-          <DemandList items={buckets.hoje} todayStart={todayStart} messages={messages} />
-        </Section>
-      )}
-      {buckets["sem-data"].length > 0 && (
-        <Section title="Primeira abordagem" count={buckets["sem-data"].length}>
-          <DemandList items={buckets["sem-data"]} todayStart={todayStart} messages={messages} />
-        </Section>
-      )}
-      {proximos.length > 0 && (
-        <Section title="Próximos" count={proximos.length}>
-          <DemandList items={proximos} todayStart={todayStart} messages={messages} />
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function FilteredList({
-  filter,
-  buckets,
-  todayStart,
-  messages,
-}: {
-  filter: Exclude<Filter, "concluidas">;
-  buckets: Record<DemandBucket, Demand[]>;
-  todayStart: Date;
-  messages: Map<string, string>;
-}) {
-  const groups: { title: string; items: Demand[]; tone?: "danger" }[] =
-    filter === "todas"
-      ? [
-          { title: "Atrasadas", items: buckets.atrasadas, tone: "danger" as const },
-          { title: "Hoje", items: buckets.hoje },
-          { title: "Primeira abordagem", items: buckets["sem-data"] },
-          { title: "Amanhã", items: buckets.amanha },
-          { title: "Próximos 7 dias", items: buckets.semana },
-          { title: "Depois", items: buckets.depois },
-        ].filter((g) => g.items.length > 0)
-      : [
-          {
-            title: FILTERS.find((c) => c.key === filter)!.label,
-            items: buckets[filter as DemandBucket] ?? [],
-            tone: filter === "atrasadas" ? ("danger" as const) : undefined,
-          },
-        ];
-
-  if (groups.every((g) => g.items.length === 0)) {
-    return <p className="py-4 text-sm text-muted">Nenhuma demanda aqui.</p>;
-  }
-
-  return (
-    <div className="flex max-w-3xl flex-col gap-6">
-      {groups.map((g) => (
-        <Section key={g.title} title={g.title} count={g.items.length} tone={g.tone}>
-          <DemandList items={g.items} todayStart={todayStart} messages={messages} />
-        </Section>
-      ))}
-    </div>
+    <Link
+      href={href}
+      className="flex flex-col gap-0.5 rounded-lg border border-border bg-surface p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-all hover:border-accent/50 hover:shadow-md"
+    >
+      <span
+        className={`font-display text-xl font-bold tabular-nums ${
+          danger ? "text-danger" : accent ? "text-accent-2" : "text-foreground"
+        }`}
+      >
+        {value}
+      </span>
+      <span className="text-[11px] text-muted">{label}</span>
+    </Link>
   );
 }
