@@ -30,7 +30,23 @@ begin
       ('La Pergoletta', 'la-pergoletta')
     ) as clients(name, slug)
   loop
-    if not exists (select 1 from public.leads where lower(name) = lower(client_name)) then
+    update public.leads
+    set pipeline_stage = 'closed',
+        business_status = 'client',
+        record_source = 'historical',
+        closed_at = null,
+        churned_at = null,
+        contact_round = null,
+        cadence_step = 0,
+        next_action_type = null,
+        next_action_at = null,
+        next_follow_up_at = null,
+        archived_at = null,
+        lost_reason = null,
+        last_activity_at = now()
+    where lower(name) = lower(client_name);
+
+    if not found then
       insert into public.leads (
         region_id,
         place_id,
