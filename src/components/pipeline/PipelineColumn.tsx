@@ -29,13 +29,15 @@ export function PipelineColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex h-full w-[264px] shrink-0 flex-col rounded-lg bg-surface-2/50 transition-colors ${
-        isOver ? "ring-2 ring-accent/50" : ""
+      className={`flex h-full w-[264px] shrink-0 flex-col rounded-lg border transition-all ${
+        isOver
+          ? "border-accent/60 bg-accent-soft/30 ring-2 ring-accent/30"
+          : "border-border/60 bg-surface-2/70"
       }`}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg bg-surface-2/80 px-3 py-2 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg border-b border-border/40 bg-surface-2 px-3 py-2.5">
         <span className="text-[13px] font-semibold text-foreground">{PIPELINE_STAGE_LABELS[stage]}</span>
-        <span className="tabular-nums text-xs text-muted">{leads.length}</span>
+        <span className="rounded-full bg-surface px-1.5 py-0.5 text-[11px] tabular-nums text-muted">{leads.length}</span>
       </div>
       {totalValue !== undefined && totalValue > 0 && (
         <div className="px-3 pb-1 text-[11px] tabular-nums text-muted">{currencyFormatter.format(totalValue)}</div>

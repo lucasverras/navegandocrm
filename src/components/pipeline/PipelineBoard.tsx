@@ -290,7 +290,7 @@ export function PipelineBoard({
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="flex gap-3 overflow-x-auto rounded-xl bg-surface-2/40 p-3 pb-3">
             {PIPELINE_STAGES.map((stage) => (
               <div key={stage} className={stage === mobileStage ? "block w-full md:w-auto" : "hidden md:block"}>
                 <PipelineColumn

@@ -69,8 +69,8 @@ export function PipelineCard({
       style={style}
       onClick={handleCardClick}
       className={cn(
-        "group flex cursor-grab select-none flex-col gap-1.5 rounded-lg border border-border bg-surface p-2.5 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-opacity active:cursor-grabbing",
-        isDragging && "opacity-40"
+        "group flex cursor-grab select-none flex-col gap-1.5 rounded-lg border border-border bg-surface p-2.5 text-sm shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all hover:shadow-md active:cursor-grabbing",
+        isDragging && "scale-[1.02] opacity-60 shadow-lg ring-2 ring-accent/40"
       )}
       {...attributes}
       {...listeners}
