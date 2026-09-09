@@ -9,7 +9,8 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { BRL } from "@/lib/finance";
 import { cn, formatHumanDate, daysFromNow } from "@/lib/utils";
 import type { LeadRow } from "@/types/database";
-import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, MEETING_STATUSES, MEETING_STATUS_LABELS } from "@/types/domain";
+import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS, MEETING_STATUSES, MEETING_STATUS_LABELS, CONTACT_ROUND_SHORT } from "@/types/domain";
+import type { ContactRound } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
 const FOLLOW_UP_CHOICES = [
@@ -100,6 +101,12 @@ export function PipelineCard({
             <IgGlyph />
           </a>
         </div>
+      )}
+
+      {lead.contact_round && CONTACT_ROUND_SHORT[lead.contact_round as ContactRound] && (
+        <span className="text-[11px] font-medium text-accent-2">
+          {CONTACT_ROUND_SHORT[lead.contact_round as ContactRound]}
+        </span>
       )}
 
       {lead.proposal_value != null && lead.proposal_value > 0 && (

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TrabalharFila, type FilaDemand } from "@/components/hoje/TrabalharFila";
+import { TrabalharRodada } from "@/components/hoje/TrabalharRodada";
 import { DemandRow } from "@/components/hoje/DemandRow";
 import { ChecklistPanel } from "@/components/hoje/ChecklistPanel";
 import { BRL } from "@/lib/finance";
@@ -169,16 +170,18 @@ export default async function HojePage() {
                 {(Object.entries(roundCounts) as [ContactRound, number][])
                   .filter(([, count]) => count > 0)
                   .map(([round, count]) => (
-                    <Link
+                    <div
                       key={round}
-                      href={`/pipeline?round=${round}`}
-                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm transition-colors hover:bg-surface-2"
+                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm"
                     >
                       <span className="text-foreground">{CONTACT_ROUND_LABELS[round]}</span>
-                      <span className="tabular-nums text-muted">
-                        {count} pendente{count > 1 ? "s" : ""}
-                      </span>
-                    </Link>
+                      <div className="flex items-center gap-3">
+                        <span className="tabular-nums text-muted">
+                          {count} pendente{count > 1 ? "s" : ""}
+                        </span>
+                        <TrabalharRodada round={round} />
+                      </div>
+                    </div>
                   ))}
               </div>
             </HomeSection>
