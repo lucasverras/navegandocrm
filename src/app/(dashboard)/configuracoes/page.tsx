@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { Card, CardContent } from "@/components/ui/Card";
 import { SettingsForm, type UsageLimitsValue } from "@/components/settings/SettingsForm";
 import { Compass, MapPin } from "lucide-react";
 
 const DEFAULT_LIMITS: UsageLimitsValue = {
-  haiku_analyses_per_day: 100,
+  ai_analyses_per_day: 100,
   decision_maker_searches_per_day: 20,
-  sonnet_refinements_per_day: 10,
+  ai_refinements_per_day: 10,
 };
 
 const ITEMS = [
@@ -21,9 +20,11 @@ export default async function ConfiguracoesPage() {
   const { data: rows } = await supabase.from("settings").select("key, value");
   const byKey = new Map(((rows ?? []) as { key: string; value: unknown }[]).map((r) => [r.key, r.value]));
 
-  const usageLimits = {
-    ...DEFAULT_LIMITS,
-    ...((byKey.get("usage_limits") as Partial<UsageLimitsValue> | undefined) ?? {}),
+  const stored = (byKey.get("usage_limits") as Record<string, number> | undefined) ?? {};
+  const usageLimits: UsageLimitsValue = {
+    ai_analyses_per_day: stored.ai_analyses_per_day ?? stored.haiku_analyses_per_day ?? DEFAULT_LIMITS.ai_analyses_per_day,
+    decision_maker_searches_per_day: stored.decision_maker_searches_per_day ?? DEFAULT_LIMITS.decision_maker_searches_per_day,
+    ai_refinements_per_day: stored.ai_refinements_per_day ?? stored.sonnet_refinements_per_day ?? DEFAULT_LIMITS.ai_refinements_per_day,
   };
   const blocklist = (byKey.get("discovery_blocklist") as
     | { extra_blocked_keywords?: string[]; extra_blocked_brands?: string[] }
@@ -34,7 +35,7 @@ export default async function ConfiguracoesPage() {
       <PageHeading
         eyebrow="Ajustes"
         title="Configurações"
-        subtitle="Limites de uso da IA e filtros globais de descoberta em um só lugar."
+        subtitle="Limites de IA, filtros de descoberta e acesso rápido a campanhas e regiões."
       />
 
       <SettingsForm
@@ -43,26 +44,24 @@ export default async function ConfiguracoesPage() {
         initialBlockedBrands={blocklist.extra_blocked_brands ?? []}
       />
 
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-muted">Campanhas e regiões</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <section>
+        <h2 className="mb-3 text-sm font-semibold text-foreground">Campanhas e regiões</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {ITEMS.map(({ href, title, desc, icon: Icon }) => (
             <Link key={href} href={href}>
-              <Card className="h-full transition-colors hover:border-accent">
-                <CardContent className="flex items-start gap-3 p-5">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 text-accent-2">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-foreground">{title}</div>
-                    <p className="text-sm text-muted">{desc}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-surface p-4 transition-colors hover:border-accent/40 hover:shadow-sm">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-accent-2">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-foreground">{title}</div>
+                  <p className="truncate text-xs text-muted">{desc}</p>
+                </div>
+              </div>
             </Link>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

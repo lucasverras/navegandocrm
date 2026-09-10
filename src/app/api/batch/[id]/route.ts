@@ -51,6 +51,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const text = await fileResponse.text();
   const lines = text.split("\n").filter(Boolean);
 
+  const allIds = lines.map((l) => { try { return JSON.parse(l).custom_id; } catch { return null; } }).filter(Boolean) as string[];
+  const { data: leadsRegions } = await admin.from("leads").select("id, region_id").in("id", allIds);
+  const regionById = new Map<string, string | null>();
+  for (const lr of (leadsRegions ?? []) as { id: string; region_id: string | null }[]) {
+    regionById.set(lr.id, lr.region_id);
+  }
+
   for (const line of lines) {
     let parsedLine: BatchOutputLine;
     try {
@@ -65,9 +72,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       continue;
     }
 
-    const { data: leadRaw } = await admin.from("leads").select("region_id").eq("id", leadId).maybeSingle();
-    if (!leadRaw) continue;
-    const lead = leadRaw as unknown as { region_id: string | null };
+    if (!regionById.has(leadId)) continue;
+    const regionId = regionById.get(leadId) ?? null;
 
     const rawText = extractOutputText(parsedLine.response.body);
     let parsedJson: unknown;
@@ -90,43 +96,43 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const outputTokens = usage?.output_tokens ?? 0;
     const cost = estimateCostUSD(model, inputTokens, outputTokens);
 
-    await admin.from("lead_analysis").insert({
-      lead_id: leadId,
-      model,
-      opportunity_score: result.opportunity_score,
-      contact_score: result.contact_score,
-      business_strength: result.business_strength,
-      marketing_status: result.marketing_status,
-      agency_status: result.agency_status,
-      agency_confidence: result.agency_confidence,
-      opportunity_focus: result.opportunity_focus,
-      main_opportunity: result.main_opportunity,
-      evidence: result.evidence,
-      recommended_service: result.recommended_service,
-      recommended_approach: result.recommended_approach,
-      risks: result.risks,
-      should_contact: result.should_contact,
-      reason: result.reason,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      estimated_cost_usd: cost,
-    });
-
-    await admin
-      .from("leads")
-      .update({ ai_score: result.opportunity_score, agency_status: result.agency_status })
-      .eq("id", leadId);
-
-    await logApiUsage({
-      service: "openai",
-      model,
-      operation: "haiku_analysis_batch",
-      inputTokens,
-      outputTokens,
-      estimatedCostUsd: cost,
-      leadId,
-      regionId: lead.region_id,
-    });
+    await Promise.all([
+      admin.from("lead_analysis").insert({
+        lead_id: leadId,
+        model,
+        opportunity_score: result.opportunity_score,
+        contact_score: result.contact_score,
+        business_strength: result.business_strength,
+        marketing_status: result.marketing_status,
+        agency_status: result.agency_status,
+        agency_confidence: result.agency_confidence,
+        opportunity_focus: result.opportunity_focus,
+        main_opportunity: result.main_opportunity,
+        evidence: result.evidence,
+        recommended_service: result.recommended_service,
+        recommended_approach: result.recommended_approach,
+        risks: result.risks,
+        should_contact: result.should_contact,
+        reason: result.reason,
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        estimated_cost_usd: cost,
+      }),
+      admin
+        .from("leads")
+        .update({ ai_score: result.opportunity_score, agency_status: result.agency_status })
+        .eq("id", leadId),
+      logApiUsage({
+        service: "openai",
+        model,
+        operation: "ai_analysis_batch",
+        inputTokens,
+        outputTokens,
+        estimatedCostUsd: cost,
+        leadId,
+        regionId,
+      }),
+    ]);
 
     ingested += 1;
   }

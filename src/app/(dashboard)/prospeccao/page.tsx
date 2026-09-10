@@ -20,39 +20,32 @@ export default async function ProspeccaoPage({ searchParams }: { searchParams: P
 
   // First level: no region selected → show the regions with their funnel counts.
   if (!region) {
-    // Regions + per-region counts via individual count queries (NOT a full-table rollup).
-    // The old approach fetched ALL leads just to tally per-region counts — a full table scan
-    // that got slower with every lead added. Count queries are head:true (no row data).
-    const { data: regionsRaw } = await supabase
-      .from("regions")
-      .select("id, neighborhood, city")
-      .order("neighborhood", { ascending: true })
-      .limit(100);
+    const [{ data: regionsRaw }, { data: leadCounts }] = await Promise.all([
+      supabase
+        .from("regions")
+        .select("id, neighborhood, city")
+        .order("neighborhood", { ascending: true })
+        .limit(100),
+      supabase
+        .from("leads")
+        .select("region_id, triage_status, preparation_status, pipeline_stage, archived_at")
+        .is("archived_at", null)
+        .limit(5000),
+    ]);
     const regions = (regionsRaw ?? []) as { id: string; neighborhood: string; city: string }[];
-
-    // Parallel count queries — one set for all regions + one for null region.
-    const ids = [...regions.map((r) => r.id), "none"];
-    const countResults = await Promise.all(
-      ids.map(async (rid) => {
-        const scope = <T,>(q: T): T => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let x: any = q;
-          if (rid === "none") x = x.is("region_id", null);
-          else x = x.eq("region_id", rid);
-          return x;
-        };
-        const [{ count: total }, { count: pending }, { count: approved }, { count: ready }] = await Promise.all([
-          scope(supabase.from("leads").select("id", { count: "exact", head: true }).is("archived_at", null)),
-          scope(supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "pending_review")),
-          scope(supabase.from("leads").select("id", { count: "exact", head: true }).eq("triage_status", "approved").neq("preparation_status", "ready")),
-          scope(supabase.from("leads").select("id", { count: "exact", head: true }).eq("preparation_status", "ready").is("pipeline_stage", null)),
-        ]);
-        return { rid, total: total ?? 0, pending: pending ?? 0, approved: approved ?? 0, ready: ready ?? 0 };
-      })
-    );
+    const leads = (leadCounts ?? []) as { region_id: string | null; triage_status: string; preparation_status: string | null; pipeline_stage: string | null }[];
 
     const byRegion = new Map<string, Counts>();
-    for (const c of countResults) byRegion.set(c.rid, c);
+    const empty = (): Counts => ({ total: 0, pending: 0, approved: 0, ready: 0 });
+    for (const l of leads) {
+      const key = l.region_id ?? "none";
+      const c = byRegion.get(key) ?? empty();
+      c.total++;
+      if (l.triage_status === "pending_review") c.pending++;
+      if (l.triage_status === "approved" && l.preparation_status !== "ready") c.approved++;
+      if (l.preparation_status === "ready" && !l.pipeline_stage) c.ready++;
+      byRegion.set(key, c);
+    }
 
     const rows = regions.map((r) => ({ ...r, counts: byRegion.get(r.id) ?? { total: 0, pending: 0, approved: 0, ready: 0 } }));
     const semRegiao = byRegion.get("none");

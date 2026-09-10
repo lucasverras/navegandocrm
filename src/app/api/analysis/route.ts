@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const usage = await checkUsageLimit("haiku_analysis");
+  const usage = await checkUsageLimit("ai_analysis");
   if (!usage.allowed) {
     return NextResponse.json(
       { error: `Limite diário de análises de IA atingido (${usage.used}/${usage.limit}). Tente novamente amanhã ou ajuste o limite em Configurações.` },
@@ -153,43 +153,43 @@ export async function POST(req: NextRequest) {
       const outputTokens = response.usage?.output_tokens ?? 0;
       const cost = estimateCostUSD(model, inputTokens, outputTokens);
 
-      await admin.from("lead_analysis").insert({
-        lead_id: lead.id,
-        model,
-        opportunity_score: result.opportunity_score,
-        contact_score: result.contact_score,
-        business_strength: result.business_strength,
-        marketing_status: result.marketing_status,
-        agency_status: result.agency_status,
-        agency_confidence: result.agency_confidence,
-        opportunity_focus: result.opportunity_focus,
-        main_opportunity: result.main_opportunity,
-        evidence: result.evidence,
-        recommended_service: result.recommended_service,
-        recommended_approach: result.recommended_approach,
-        risks: result.risks,
-        should_contact: result.should_contact,
-        reason: result.reason,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        estimated_cost_usd: cost,
-      });
-
-      await admin
-        .from("leads")
-        .update({ ai_score: result.opportunity_score, agency_status: result.agency_status })
-        .eq("id", lead.id);
-
-      await logApiUsage({
-        service: "openai",
-        model,
-        operation: "haiku_analysis",
-        inputTokens,
-        outputTokens,
-        estimatedCostUsd: cost,
-        leadId: lead.id,
-        regionId: lead.region_id,
-      });
+      await Promise.all([
+        admin.from("lead_analysis").insert({
+          lead_id: lead.id,
+          model,
+          opportunity_score: result.opportunity_score,
+          contact_score: result.contact_score,
+          business_strength: result.business_strength,
+          marketing_status: result.marketing_status,
+          agency_status: result.agency_status,
+          agency_confidence: result.agency_confidence,
+          opportunity_focus: result.opportunity_focus,
+          main_opportunity: result.main_opportunity,
+          evidence: result.evidence,
+          recommended_service: result.recommended_service,
+          recommended_approach: result.recommended_approach,
+          risks: result.risks,
+          should_contact: result.should_contact,
+          reason: result.reason,
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          estimated_cost_usd: cost,
+        }),
+        admin
+          .from("leads")
+          .update({ ai_score: result.opportunity_score, agency_status: result.agency_status })
+          .eq("id", lead.id),
+        logApiUsage({
+          service: "openai",
+          model,
+          operation: "ai_analysis",
+          inputTokens,
+          outputTokens,
+          estimatedCostUsd: cost,
+          leadId: lead.id,
+          regionId: lead.region_id,
+        }),
+      ]);
 
       analyzed += 1;
     } catch (err) {

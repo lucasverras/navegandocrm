@@ -4,16 +4,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/types/database";
 import { z } from "zod";
 
-// Settings are key/value rows in `public.settings` (jsonb value). Two keys matter here:
-//   - `usage_limits`        → { haiku_analyses_per_day, decision_maker_searches_per_day, sonnet_refinements_per_day }
-//     (read/written by src/lib/cost-control.ts — keep this shape intact)
-//   - `discovery_blocklist` → { extra_blocked_keywords: string[], extra_blocked_brands: string[] }
-//     (global supplement to the hardcoded discovery filter)
-
 const usageLimitsSchema = z.object({
-  haiku_analyses_per_day: z.number().int().min(0).max(100000),
+  ai_analyses_per_day: z.number().int().min(0).max(100000),
   decision_maker_searches_per_day: z.number().int().min(0).max(100000),
-  sonnet_refinements_per_day: z.number().int().min(0).max(100000),
+  ai_refinements_per_day: z.number().int().min(0).max(100000),
 });
 
 // Free-form list of short strings; trimmed + de-duped on the way in.

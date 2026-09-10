@@ -144,7 +144,7 @@ export default async function HojePage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-foreground">
-            {greeting()}, Lucas
+            {greeting()}
           </h1>
           <p className="mt-0.5 text-sm capitalize text-muted">{DATE_FMT.format(now)}</p>
         </div>
@@ -162,29 +162,30 @@ export default async function HojePage() {
             />
           </HomeSection>
 
-          {/* Rodadas de contato (§22-27) */}
-          {totalRounds > 0 && (
-            <HomeSection title="Rodadas de contato">
-              <div className="flex flex-col gap-1">
-                {(Object.entries(roundCounts) as [ContactRound, number][])
-                  .filter(([, count]) => count > 0)
-                  .map(([round, count]) => (
-                    <div
-                      key={round}
-                      className="flex items-center justify-between rounded-md px-2 py-2 text-sm"
-                    >
-                      <span className="text-foreground">{CONTACT_ROUND_LABELS[round]}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="tabular-nums text-muted">
-                          {count} pendente{count > 1 ? "s" : ""}
-                        </span>
-                        <TrabalharRodada round={round} />
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </HomeSection>
-          )}
+          {/* Rodadas de contato (§22-27) — always visible, compact when empty */}
+          <HomeSection title="Rodadas de contato">
+            <div className="flex flex-col">
+              {(Object.entries(roundCounts) as [ContactRound, number][]).map(([round, count]) => (
+                <div
+                  key={round}
+                  className="flex items-center justify-between border-b border-border-subtle py-2 last:border-b-0"
+                >
+                  <span className={count > 0 ? "text-sm text-foreground" : "text-sm text-muted"}>
+                    {CONTACT_ROUND_LABELS[round]}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={`tabular-nums text-sm ${count > 0 ? "font-medium text-foreground" : "text-muted"}`}>
+                      {count}
+                    </span>
+                    {count > 0 && <TrabalharRodada round={round} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {totalRounds === 0 && (
+              <p className="mt-2 text-xs text-muted">Nenhum lead aguardando contato.</p>
+            )}
+          </HomeSection>
 
           {/* Demandas específicas — leads com compromisso de data */}
           {urgentDemands.length > 0 && (
@@ -207,29 +208,31 @@ export default async function HojePage() {
             </HomeSection>
           )}
 
-          {/* Empty state */}
-          {urgentDemands.length === 0 && futureDemands.length === 0 && totalRounds === 0 && (
-            <div className="py-4">
-              <p className="text-sm text-muted">Nenhuma demanda pendente.</p>
+          {/* Empty state — only when no demands at all */}
+          {urgentDemands.length === 0 && futureDemands.length === 0 && (
+            <div className="rounded-lg border border-border-subtle bg-surface p-4">
+              <p className="text-sm text-muted">Nenhuma demanda com data definida.</p>
               <Link
                 href="/prospeccao"
-                className="mt-2 inline-block rounded-md bg-accent px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-2"
+                className="mt-2 inline-block text-sm font-medium text-accent-2 hover:text-accent"
               >
-                Prospectar novos restaurantes
+                Prospectar novos restaurantes →
               </Link>
             </div>
           )}
         </div>
 
-        {/* RIGHT COLUMN — Summary strip + Reembolsos */}
-        <div className="flex flex-col gap-6">
-          {/* Quick stats strip */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Atrasados" value={buckets.atrasadas.length} href="/hoje" danger={buckets.atrasadas.length > 0} />
-            <StatCard label="Rodadas" value={totalRounds} href="/pipeline" />
-            <StatCard label="Hoje" value={buckets.hoje.length} href="/hoje" accent={buckets.hoje.length > 0} />
-            <StatCard label="Próximos" value={futureDemands.length} href="/hoje" />
-          </div>
+        {/* RIGHT COLUMN — Summary + Reembolsos */}
+        <div className="flex flex-col gap-4">
+          {/* Operation summary */}
+          <HomeSection title="Resumo da operação">
+            <div className="flex flex-col gap-1.5">
+              <StatCard label="Atrasados" value={buckets.atrasadas.length} href="/hoje" danger={buckets.atrasadas.length > 0} />
+              <StatCard label="Hoje" value={buckets.hoje.length} href="/hoje" accent={buckets.hoje.length > 0} />
+              <StatCard label="Rodadas pendentes" value={totalRounds} href="/pipeline" />
+              <StatCard label="Próximos dias" value={futureDemands.length} href="/hoje" />
+            </div>
+          </HomeSection>
 
           {/* Reembolsos pendentes (§21/§61) */}
           {reimbs.length > 0 && (
@@ -261,7 +264,7 @@ export default async function HojePage() {
 
 function HomeSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+    <section className="rounded-lg border border-border bg-surface p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
       <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{title}</h2>
       {children}
     </section>
@@ -271,7 +274,6 @@ function HomeSection({ title, children }: { title: string; children: React.React
 function StatCard({
   label,
   value,
-  href,
   danger,
   accent,
 }: {
@@ -282,18 +284,15 @@ function StatCard({
   accent?: boolean;
 }) {
   return (
-    <Link
-      href={href}
-      className="flex flex-col gap-0.5 rounded-lg border border-border bg-surface p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-all hover:border-accent/50 hover:shadow-md"
-    >
+    <div className="flex items-center justify-between py-1">
+      <span className="text-sm text-muted">{label}</span>
       <span
-        className={`font-display text-xl font-bold tabular-nums ${
+        className={`text-sm font-semibold tabular-nums ${
           danger ? "text-danger" : accent ? "text-accent-2" : "text-foreground"
         }`}
       >
         {value}
       </span>
-      <span className="text-[11px] text-muted">{label}</span>
-    </Link>
+    </div>
   );
 }

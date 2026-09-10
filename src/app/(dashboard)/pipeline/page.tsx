@@ -45,7 +45,7 @@ export default async function PipelinePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <PageHeading eyebrow="Funil comercial" title="Pipeline" />
         <PipelineAddLead />
@@ -63,7 +63,12 @@ export default async function PipelinePage() {
           .
         </p>
       )}
-      <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} messages={messages} />
+      {/* Break out of the max-w-7xl container so the board uses all available space */}
+      <div className="-mx-4 sm:-mx-6 lg:-mx-8">
+        <div className="px-2 sm:px-3">
+          <PipelineBoard initialLeads={typedLeads} archivedLeads={typedArchived} regionMap={regionMap} messages={messages} />
+        </div>
+      </div>
     </div>
   );
 }

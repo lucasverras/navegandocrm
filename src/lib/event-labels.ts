@@ -26,6 +26,7 @@ const TRIAGE_LABELS: Record<string, string> = {
 const STATIC_LABELS: Record<string, string> = {
   lead_discovered: "Lead descoberto",
   instagram_found: "Instagram encontrado",
+  ai_analysis: "Análise de IA",
   haiku_analysis: "Análise de IA",
   batch_analysis_queued: "Análise em lote enfileirada",
   message_generated: "Mensagem gerada",
