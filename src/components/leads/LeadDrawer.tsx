@@ -10,7 +10,7 @@ import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { eventLabel } from "@/lib/event-labels";
 import { formatDate, formatHumanDate, daysFromNow } from "@/lib/utils";
 import { BRL } from "@/lib/finance";
-import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS, CONTACT_ROUND_LABELS } from "@/types/domain";
 
 type Summary = {
   lead: {
@@ -38,6 +38,7 @@ type Summary = {
     proposal_value: number | null;
     proposal_note: string | null;
     proposal_sent_at: string | null;
+    contact_round: string | null;
     regions: { neighborhood: string; city: string } | null;
   };
   decisionMaker: { name: string | null; role: string | null; confidence: number } | null;
@@ -275,23 +276,35 @@ export function LeadDrawer() {
               </Section>
             )}
 
+            {/* Commercial data */}
+            <Section title="Comercial">
+              <div className="flex flex-col gap-1 text-sm">
+                <Row label="Etapa" value={lead.pipeline_stage ? (PIPELINE_STAGE_LABELS[lead.pipeline_stage as keyof typeof PIPELINE_STAGE_LABELS] ?? lead.pipeline_stage) : "—"} />
+                <Row label="Rodada" value={lead.contact_round ? (CONTACT_ROUND_LABELS[lead.contact_round as keyof typeof CONTACT_ROUND_LABELS] ?? lead.contact_round) : "—"} />
+                {lead.meeting_at && <Row label="Reunião" value={formatDate(lead.meeting_at)} />}
+                {lead.proposal_value != null && (
+                  <Row label="Proposta" value={`${BRL.format(lead.proposal_value)}/mês`} />
+                )}
+                {lead.regions && <Row label="Região" value={lead.regions.neighborhood} />}
+              </div>
+            </Section>
+
             <Section title="Notas">
               <textarea
-                rows={3}
+                rows={2}
                 value={notesDraft ?? lead.notes ?? ""}
                 onChange={(e) => setNotesDraft(e.target.value)}
-                placeholder="Anote algo sobre este lead…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    saveNotes();
+                  }
+                }}
+                placeholder="Adicionar nota... (Enter salva)"
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
               />
               {notesDraft != null && notesDraft !== (lead.notes ?? "") && (
-                <button
-                  type="button"
-                  disabled={busy === "notes"}
-                  onClick={saveNotes}
-                  className="mt-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-2 disabled:opacity-50"
-                >
-                  {busy === "notes" ? "Salvando…" : "Salvar nota"}
-                </button>
+                <p className="mt-1 text-[10px] text-muted">Enter para salvar · Shift+Enter nova linha</p>
               )}
             </Section>
 
@@ -327,6 +340,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div>
       <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">{title}</p>
       {children}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-xs text-muted">{label}</span>
+      <span className="text-xs text-foreground">{value}</span>
     </div>
   );
 }
