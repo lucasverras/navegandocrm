@@ -15,6 +15,7 @@ import {
   type DemandBucket,
 } from "@/components/hoje/demand";
 import { CONTACT_ROUND_LABELS, type ContactRound } from "@/types/domain";
+import { formatHumanDate } from "@/lib/utils";
 import type { OutreachMessageRow } from "@/types/database";
 
 // V7 §16-17: Hoje = CHECKLISTS + RODADAS + DEMANDAS. Não é post-it, não é dashboard de KPI.
@@ -49,6 +50,8 @@ export default async function HojePage() {
     { data: reimbRaw },
     { data: messagesRaw },
     { data: orphansRaw },
+    { data: meetingsRaw },
+    { data: proposalsRaw },
   ] = await Promise.all([
     supabase
       .from("leads")
@@ -96,11 +99,30 @@ export default async function HojePage() {
       .not("pipeline_stage", "is", null)
       .neq("pipeline_stage", "closed")
       .limit(50),
+    supabase
+      .from("leads")
+      .select("id, name, meeting_at, meeting_link")
+      .is("archived_at", null)
+      .not("meeting_at", "is", null)
+      .gte("meeting_at", now.toISOString())
+      .neq("pipeline_stage", "closed")
+      .order("meeting_at", { ascending: true })
+      .limit(10),
+    supabase
+      .from("leads")
+      .select("id, name, proposal_value, proposal_sent_at")
+      .is("archived_at", null)
+      .not("proposal_sent_at", "is", null)
+      .neq("pipeline_stage", "closed")
+      .order("proposal_sent_at", { ascending: false })
+      .limit(10),
   ]);
 
   const demands = (demandsRaw ?? []) as unknown as Demand[];
   const rounds = (roundsRaw ?? []) as { id: string; contact_round: ContactRound; next_action_at: string | null }[];
   const orphanLeads = (orphansRaw ?? []) as { id: string; name: string; pipeline_stage: string }[];
+  const meetings = (meetingsRaw ?? []) as { id: string; name: string; meeting_at: string; meeting_link: string | null }[];
+  const proposals = (proposalsRaw ?? []) as { id: string; name: string; proposal_value: number | null; proposal_sent_at: string }[];
 
   // Bucketize dated demands.
   const buckets: Record<DemandBucket, Demand[]> = {
@@ -258,7 +280,44 @@ export default async function HojePage() {
             </div>
           </HomeSection>
 
-          {/* Reembolsos pendentes (§21/§61) */}
+          {/* Próximas reuniões */}
+          {meetings.length > 0 && (
+            <HomeSection title="Próximas reuniões">
+              <ul className="flex flex-col">
+                {meetings.map((m) => (
+                  <li key={m.id} className="flex items-center justify-between border-b border-border-subtle py-2 last:border-b-0">
+                    <LeadDrawerLink leadId={m.id}>{m.name}</LeadDrawerLink>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs tabular-nums text-muted">{formatHumanDate(m.meeting_at)}</span>
+                      {m.meeting_link && (
+                        <a href={m.meeting_link} target="_blank" rel="noreferrer" className="text-xs font-medium text-accent-2 hover:underline">
+                          Meet
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </HomeSection>
+          )}
+
+          {/* Propostas aguardando */}
+          {proposals.length > 0 && (
+            <HomeSection title="Propostas aguardando">
+              <ul className="flex flex-col">
+                {proposals.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between border-b border-border-subtle py-2 last:border-b-0">
+                    <LeadDrawerLink leadId={p.id}>{p.name}</LeadDrawerLink>
+                    <span className="text-xs font-medium tabular-nums text-foreground">
+                      {p.proposal_value ? `${BRL.format(p.proposal_value)}/mês` : "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </HomeSection>
+          )}
+
+          {/* Reembolsos pendentes */}
           {reimbs.length > 0 && (
             <HomeSection title="Reembolsos pendentes">
               <ul className="flex flex-col">
