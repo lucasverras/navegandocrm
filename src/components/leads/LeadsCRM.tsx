@@ -229,7 +229,10 @@ export function LeadsCRM({
                   >
                     {/* Lead name */}
                     <td className={tdClass}>
-                      <LeadDrawerLink leadId={lead.id}>
+                      <LeadDrawerLink
+                        leadId={lead.id}
+                        preview={{ name: lead.name, phone: lead.phone, instagram_handle: lead.instagram_handle, pipeline_stage: lead.pipeline_stage }}
+                      >
                         {lead.name}
                       </LeadDrawerLink>
                     </td>

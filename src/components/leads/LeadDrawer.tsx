@@ -57,9 +57,12 @@ const FOLLOW_UP_CHOICES = [
 // O lead drawer (V6 §50): clique em lead abre isto — nunca uma página gigante. Cabeçalho com
 // nome/telefone/WhatsApp/Instagram e seções: próxima ação, notas, decisor, mensagem, reunião,
 // proposta e timeline. Aberto de qualquer lugar via CustomEvent("open-lead-drawer").
+type PartialLead = { name: string; phone?: string | null; instagram_handle?: string | null; instagram_url?: string | null; pipeline_stage?: string | null };
+
 export function LeadDrawer() {
   const [leadId, setLeadId] = useState<string | null>(null);
   const [data, setData] = useState<Summary | null>(null);
+  const [preview, setPreview] = useState<PartialLead | null>(null);
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -68,19 +71,20 @@ export function LeadDrawer() {
   const close = useCallback(() => {
     setLeadId(null);
     setData(null);
+    setPreview(null);
     setNotesDraft(null);
   }, []);
 
-  // Re-fetches the summary after a mutation (follow-up, nota) without closing the drawer.
   const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   useEffect(() => {
     function onOpen(e: Event) {
-      const id = (e as CustomEvent<{ leadId: string }>).detail?.leadId;
-      if (id) {
+      const detail = (e as CustomEvent<{ leadId: string } & Partial<PartialLead>>).detail;
+      if (detail?.leadId) {
         setData(null);
         setNotesDraft(null);
-        setLeadId(id);
+        setPreview(detail.name ? detail as PartialLead : null);
+        setLeadId(detail.leadId);
       }
     }
     function onKey(e: KeyboardEvent) {
@@ -159,21 +163,23 @@ export function LeadDrawer() {
         <div className="sticky top-0 z-10 border-b border-border bg-surface/95 p-5 pb-4 backdrop-blur-sm">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              {lead ? (
+              {(lead || preview) ? (
                 <>
-                  <h2 className="truncate font-display text-xl font-bold text-foreground">{lead.name}</h2>
-                  <p className="text-xs text-muted">
-                    {categoryLabel(lead.category)}
-                    {lead.regions ? ` · ${lead.regions.neighborhood}` : ""}
-                    {lead.pipeline_stage
-                      ? ` · ${PIPELINE_STAGE_LABELS[lead.pipeline_stage as keyof typeof PIPELINE_STAGE_LABELS] ?? lead.pipeline_stage}`
-                      : ""}
-                  </p>
+                  <h2 className="truncate font-display text-xl font-bold text-foreground">{lead?.name ?? preview?.name}</h2>
+                  {lead && (
+                    <p className="text-xs text-muted">
+                      {categoryLabel(lead.category)}
+                      {lead.regions ? ` · ${lead.regions.neighborhood}` : ""}
+                      {lead.pipeline_stage
+                        ? ` · ${PIPELINE_STAGE_LABELS[lead.pipeline_stage as keyof typeof PIPELINE_STAGE_LABELS] ?? lead.pipeline_stage}`
+                        : ""}
+                    </p>
+                  )}
                   <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm">
-                    {lead.phone && <span className="tabular-nums text-foreground">{lead.phone}</span>}
-                    {handle && igUrl && (
-                      <a href={igUrl} target="_blank" rel="noreferrer" className="text-accent-2 hover:underline">
-                        @{handle}
+                    {(lead?.phone ?? preview?.phone) && <span className="tabular-nums text-foreground">{lead?.phone ?? preview?.phone}</span>}
+                    {(handle || (!lead && preview?.instagram_handle)) && (igUrl || preview?.instagram_url) && (
+                      <a href={igUrl ?? preview?.instagram_url ?? "#"} target="_blank" rel="noreferrer" className="text-accent-2 hover:underline">
+                        @{handle || preview?.instagram_handle?.replace(/^@/, "")}
                       </a>
                     )}
                   </p>
@@ -353,14 +359,23 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-// Text trigger — renders like a link but opens the drawer (used on demand rows, lists, cards).
-export function LeadDrawerLink({ leadId, children, className }: { leadId: string; children: React.ReactNode; className?: string }) {
+export function LeadDrawerLink({
+  leadId,
+  children,
+  className,
+  preview,
+}: {
+  leadId: string;
+  children: React.ReactNode;
+  className?: string;
+  preview?: Partial<PartialLead>;
+}) {
   return (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId } }));
+        window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId, ...preview } }));
       }}
       className={className ?? "truncate text-left text-sm font-semibold text-foreground transition-colors hover:text-accent-2"}
     >

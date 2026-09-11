@@ -57,7 +57,7 @@ export function PipelineCard({
     const target = e.target as HTMLElement;
     if (target.closest("[data-no-navigate]")) return;
     // §50: click opens the side drawer — the board never navigates away.
-    window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId: lead.id } }));
+    window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId: lead.id, name: lead.name, phone: lead.phone, instagram_handle: lead.instagram_handle, pipeline_stage: lead.pipeline_stage } }));
   }
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
 
