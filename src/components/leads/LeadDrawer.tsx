@@ -384,11 +384,11 @@ export function LeadDrawerLink({
   );
 }
 
-// Eye button that opens the preview drawer for a lead.
 export function LeadPreviewTrigger({ leadId, className }: { leadId: string; className?: string }) {
   return (
     <button
       type="button"
+      onMouseEnter={() => fetch(`/api/leads/${leadId}`)}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
