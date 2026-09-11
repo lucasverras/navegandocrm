@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { CalendarClock, FileText, X } from "lucide-react";
@@ -9,7 +8,6 @@ import { PROPOSAL_STATUS_LABELS, PROPOSAL_STATUSES, type ProposalStatus } from "
 
 // Structured Reunião + Proposta capture (simple, per brief). Lives in the lead header actions.
 export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: string; proposalStatus?: ProposalStatus | null }) {
-  const router = useRouter();
   const [dialog, setDialog] = useState<null | "meeting" | "proposal">(null);
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("");
@@ -30,7 +28,6 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
     if (!res.ok) return toast.error("Erro ao marcar reunião");
     toast.success("Reunião marcada");
     setDialog(null);
-    router.refresh();
   }
 
   async function saveProposal() {
@@ -44,7 +41,6 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
     if (!res.ok) return toast.error("Erro ao registrar proposta");
     toast.success("Proposta registrada");
     setDialog(null);
-    router.refresh();
   }
 
   async function updateProposalStatus(status: ProposalStatus) {
@@ -58,7 +54,6 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
     setBusy(false);
     if (!res.ok) return toast.error("Erro ao atualizar a proposta");
     toast.success(`Proposta ${PROPOSAL_STATUS_LABELS[status].toLowerCase()}`);
-    router.refresh();
   }
 
   const input = "h-9 w-full rounded-md border border-border bg-surface-2 px-2 text-sm text-foreground outline-none focus:border-accent";

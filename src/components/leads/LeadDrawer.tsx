@@ -10,7 +10,8 @@ import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { eventLabel } from "@/lib/event-labels";
 import { formatDate, formatHumanDate, daysFromNow } from "@/lib/utils";
 import { BRL } from "@/lib/finance";
-import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS, CONTACT_ROUND_LABELS } from "@/types/domain";
+import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS, PIPELINE_STAGES, CONTACT_ROUND_LABELS } from "@/types/domain";
+import type { PipelineStage } from "@/types/domain";
 
 type Summary = {
   lead: {
@@ -282,10 +283,35 @@ export function LeadDrawer() {
               </Section>
             )}
 
-            {/* Commercial data */}
+            {/* Commercial data — inline stage change */}
             <Section title="Comercial">
               <div className="flex flex-col gap-1 text-sm">
-                <Row label="Etapa" value={lead.pipeline_stage ? (PIPELINE_STAGE_LABELS[lead.pipeline_stage as keyof typeof PIPELINE_STAGE_LABELS] ?? lead.pipeline_stage) : "—"} />
+                <div className="flex items-center justify-between py-0.5">
+                  <span className="text-xs text-muted">Etapa</span>
+                  <select
+                    value={lead.pipeline_stage ?? ""}
+                    onChange={async (e) => {
+                      const stage = e.target.value || null;
+                      setBusy("stage");
+                      const res = await fetch(`/api/leads/${lead.id}/pipeline`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ stage, position: 0 }),
+                      }).catch(() => null);
+                      setBusy(null);
+                      if (!res?.ok) return void toast.error("Erro ao mover");
+                      toast.success(`Movido para ${PIPELINE_STAGE_LABELS[stage as PipelineStage] ?? "Sem etapa"}`);
+                      reload();
+                    }}
+                    disabled={busy === "stage"}
+                    className="rounded border border-border bg-surface px-2 py-0.5 text-xs text-foreground outline-none focus:border-accent"
+                  >
+                    <option value="">Sem etapa</option>
+                    {PIPELINE_STAGES.map((s) => (
+                      <option key={s} value={s}>{PIPELINE_STAGE_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
                 <Row label="Rodada" value={lead.contact_round ? (CONTACT_ROUND_LABELS[lead.contact_round as keyof typeof CONTACT_ROUND_LABELS] ?? lead.contact_round) : "—"} />
                 {lead.meeting_at && <Row label="Reunião" value={formatDate(lead.meeting_at)} />}
                 {lead.proposal_value != null && (

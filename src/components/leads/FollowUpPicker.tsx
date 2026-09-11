@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { CalendarClock } from "lucide-react";
@@ -14,8 +13,8 @@ const QUICK_OPTIONS = [
 ];
 
 export function FollowUpPicker({ leadId, current }: { leadId: string; current: string | null }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
   const [customDate, setCustomDate] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,7 +33,7 @@ export function FollowUpPicker({ leadId, current }: { leadId: string; current: s
     }
     toast.success(iso ? "Follow-up agendado" : "Follow-up removido");
     setOpen(false);
-    router.refresh();
+    setDone(true);
   }
 
   function quickDate(days: number) {

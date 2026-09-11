@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
@@ -24,9 +23,9 @@ const LABELS: Record<string, string> = {
 };
 
 export function StatusPanel({ leadId, currentStatus }: { leadId: string; currentStatus: string }) {
-  const router = useRouter();
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   async function handleSave() {
     setLoading(true);
@@ -41,7 +40,8 @@ export function StatusPanel({ leadId, currentStatus }: { leadId: string; current
       return;
     }
     toast.success("Status atualizado");
-    router.refresh();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   }
 
   async function handleDiscard() {
@@ -57,7 +57,6 @@ export function StatusPanel({ leadId, currentStatus }: { leadId: string; current
       return;
     }
     toast.success("Lead descartado");
-    router.refresh();
   }
 
   return (
@@ -66,16 +65,16 @@ export function StatusPanel({ leadId, currentStatus }: { leadId: string; current
         <CardTitle>Status comercial</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setSaved(false); }}>
           {COMMERCIAL_STATUSES.map((s) => (
             <option key={s} value={s}>
               {LABELS[s] ?? s}
             </option>
           ))}
         </Select>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button size="sm" loading={loading} onClick={handleSave}>
-            Salvar status
+            {saved ? "✓ Salvo" : "Salvar status"}
           </Button>
           <Button size="sm" variant="danger" onClick={handleDiscard}>
             Descartar lead
