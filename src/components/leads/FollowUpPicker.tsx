@@ -19,6 +19,8 @@ export function FollowUpPicker({ leadId, current }: { leadId: string; current: s
   const [loading, setLoading] = useState(false);
 
   async function setFollowUp(iso: string | null) {
+    setOpen(false);
+    setDone(true);
     setLoading(true);
     const res = await fetch(`/api/leads/${leadId}/follow-up`, {
       method: "PATCH",
@@ -27,13 +29,13 @@ export function FollowUpPicker({ leadId, current }: { leadId: string; current: s
     });
     setLoading(false);
     if (!res.ok) {
+      setDone(false);
+      setOpen(true);
       const data = await res.json().catch(() => ({}));
       toast.error(data.error ?? "Erro ao definir follow-up");
       return;
     }
     toast.success(iso ? "Follow-up agendado" : "Follow-up removido");
-    setOpen(false);
-    setDone(true);
   }
 
   function quickDate(days: number) {
@@ -45,9 +47,9 @@ export function FollowUpPicker({ leadId, current }: { leadId: string; current: s
 
   if (!open) {
     return (
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="outline" onClick={() => { setDone(false); setOpen(true); }}>
         <CalendarClock className="h-3.5 w-3.5" />
-        {current ? "Reagendar follow-up" : "Agendar follow-up"}
+        {done ? "✓ Follow-up definido" : current ? "Reagendar follow-up" : "Agendar follow-up"}
       </Button>
     );
   }

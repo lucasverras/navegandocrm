@@ -10,6 +10,8 @@ import { PROPOSAL_STATUS_LABELS, PROPOSAL_STATUSES, type ProposalStatus } from "
 export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: string; proposalStatus?: ProposalStatus | null }) {
   const [dialog, setDialog] = useState<null | "meeting" | "proposal">(null);
   const [busy, setBusy] = useState(false);
+  const [doneAction, setDoneAction] = useState<"meeting" | "proposal" | null>(null);
+  const [displayProposalStatus, setDisplayProposalStatus] = useState(proposalStatus);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [link, setLink] = useState("");
@@ -18,6 +20,8 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
 
   async function saveMeeting() {
     if (!date || !time) return toast.error("Data e hora são obrigatórias");
+    setDialog(null);
+    setDoneAction("meeting");
     setBusy(true);
     const res = await fetch(`/api/leads/${leadId}/meeting`, {
       method: "POST",
@@ -25,12 +29,16 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
       body: JSON.stringify({ meeting_at: new Date(`${date}T${time}`).toISOString(), meeting_link: link.trim() || undefined, note: note.trim() || undefined }),
     });
     setBusy(false);
-    if (!res.ok) return toast.error("Erro ao marcar reunião");
+    if (!res.ok) {
+      setDoneAction(null);
+      return toast.error("Erro ao marcar reunião");
+    }
     toast.success("Reunião marcada");
-    setDialog(null);
   }
 
   async function saveProposal() {
+    setDialog(null);
+    setDoneAction("proposal");
     setBusy(true);
     const res = await fetch(`/api/leads/${leadId}/proposal`, {
       method: "POST",
@@ -38,13 +46,17 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
       body: JSON.stringify({ value: value.trim() ? Number(value.replace(",", ".")) : null, note: note.trim() || undefined }),
     });
     setBusy(false);
-    if (!res.ok) return toast.error("Erro ao registrar proposta");
+    if (!res.ok) {
+      setDoneAction(null);
+      return toast.error("Erro ao registrar proposta");
+    }
     toast.success("Proposta registrada");
-    setDialog(null);
   }
 
   async function updateProposalStatus(status: ProposalStatus) {
     if (status === "sent") return;
+    const prevStatus = displayProposalStatus;
+    setDisplayProposalStatus(status);
     setBusy(true);
     const res = await fetch(`/api/leads/${leadId}/proposal`, {
       method: "PATCH",
@@ -52,7 +64,10 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
       body: JSON.stringify({ status }),
     });
     setBusy(false);
-    if (!res.ok) return toast.error("Erro ao atualizar a proposta");
+    if (!res.ok) {
+      setDisplayProposalStatus(prevStatus);
+      return toast.error("Erro ao atualizar a proposta");
+    }
     toast.success(`Proposta ${PROPOSAL_STATUS_LABELS[status].toLowerCase()}`);
   }
 
@@ -60,16 +75,16 @@ export function MeetingProposalActions({ leadId, proposalStatus }: { leadId: str
 
   return (
     <>
-      <Button size="sm" variant="secondary" onClick={() => { setNote(""); setDialog("meeting"); }}>
-        <CalendarClock className="h-3.5 w-3.5" /> Reunião
+      <Button size="sm" variant="secondary" onClick={() => { setNote(""); setDoneAction(null); setDialog("meeting"); }}>
+        <CalendarClock className="h-3.5 w-3.5" /> {doneAction === "meeting" ? "✓ Reunião marcada" : "Reunião"}
       </Button>
-      <Button size="sm" variant="secondary" onClick={() => { setNote(""); setValue(""); setDialog("proposal"); }}>
-        <FileText className="h-3.5 w-3.5" /> Proposta
+      <Button size="sm" variant="secondary" onClick={() => { setNote(""); setValue(""); setDoneAction(null); setDialog("proposal"); }}>
+        <FileText className="h-3.5 w-3.5" /> {doneAction === "proposal" ? "✓ Proposta registrada" : "Proposta"}
       </Button>
-      {proposalStatus && (
+      {displayProposalStatus && (
         <select
           aria-label="Status da proposta"
-          value={proposalStatus}
+          value={displayProposalStatus}
           disabled={busy}
           onChange={(e) => updateProposalStatus(e.target.value as ProposalStatus)}
           className="h-8 rounded-md border border-border bg-surface-2 px-2 text-xs text-foreground"
