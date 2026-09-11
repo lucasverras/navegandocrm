@@ -42,6 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: "preparation_status_changed",
     channel: "system",
     metadata: { status: parsed.data.action, by: user.id },
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ lead: data });

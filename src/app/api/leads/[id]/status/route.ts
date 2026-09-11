@@ -40,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: `status_${parsed.data.status}`,
     channel: "whatsapp",
     metadata: parsed.data.notes ? { notes: parsed.data.notes } : {},
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ ok: true });

@@ -55,6 +55,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: "closed_won",
     channel: "system",
     metadata: { service: parsed.data.closed_service, value: parsed.data.closed_value ?? null, changed_by: user.id },
+    performed_by: user!.id,
   });
   await admin.from("client_finance_events").insert({
     lead_id: leadId,

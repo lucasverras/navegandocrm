@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         event_type: "batch_analysis_queued",
         channel: "system",
         metadata: { batch_id: batch.id },
+        performed_by: user!.id,
       }))
     );
 

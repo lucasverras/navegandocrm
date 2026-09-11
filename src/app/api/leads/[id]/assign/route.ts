@@ -24,6 +24,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     event_type: "assigned",
     channel: "system",
     metadata: { assigned_to: parsed.data.assigned_to },
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ ok: true });

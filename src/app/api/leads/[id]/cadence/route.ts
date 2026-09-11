@@ -51,6 +51,7 @@ export async function PATCH(_req: NextRequest, { params }: { params: Promise<{ i
     event_type: "cadence_followup",
     channel: "system",
     metadata: { step: step + 1, days, by: user.id },
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ ok: true, days, step: step + 1 });

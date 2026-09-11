@@ -4,6 +4,7 @@ import { TrabalharFila, type FilaDemand } from "@/components/hoje/TrabalharFila"
 import { TrabalharRodada } from "@/components/hoje/TrabalharRodada";
 import { DemandRow } from "@/components/hoje/DemandRow";
 import { ChecklistPanel } from "@/components/hoje/ChecklistPanel";
+import { LeadDrawerLink } from "@/components/leads/LeadDrawer";
 import { BRL } from "@/lib/finance";
 import {
   DEMAND_SELECT,
@@ -47,6 +48,7 @@ export default async function HojePage() {
     { data: checkDone },
     { data: reimbRaw },
     { data: messagesRaw },
+    { data: orphansRaw },
   ] = await Promise.all([
     supabase
       .from("leads")
@@ -81,16 +83,24 @@ export default async function HojePage() {
       .select("id, description, amount, amount_received, status")
       .eq("status", "pendente")
       .limit(50),
-    // Pre-fetch messages for all demand leads (eliminates the sequential waterfall).
     supabase
       .from("outreach_messages")
       .select("lead_id, content, created_at")
       .order("created_at", { ascending: false })
       .limit(300),
+    supabase
+      .from("leads")
+      .select("id, name, pipeline_stage")
+      .is("archived_at", null)
+      .is("next_action_type", null)
+      .not("pipeline_stage", "is", null)
+      .neq("pipeline_stage", "closed")
+      .limit(50),
   ]);
 
   const demands = (demandsRaw ?? []) as unknown as Demand[];
   const rounds = (roundsRaw ?? []) as { id: string; contact_round: ContactRound; next_action_at: string | null }[];
+  const orphanLeads = (orphansRaw ?? []) as { id: string; name: string; pipeline_stage: string }[];
 
   // Bucketize dated demands.
   const buckets: Record<DemandBucket, Demand[]> = {
@@ -208,8 +218,22 @@ export default async function HojePage() {
             </HomeSection>
           )}
 
+          {/* Orphan leads — pipeline leads without a next action (§36) */}
+          {orphanLeads.length > 0 && (
+            <HomeSection title="Sem próximo passo">
+              <ul className="flex flex-col">
+                {orphanLeads.map((lead) => (
+                  <li key={lead.id} className="flex items-center justify-between border-b border-border-subtle py-2 last:border-b-0">
+                    <LeadDrawerLink leadId={lead.id}>{lead.name}</LeadDrawerLink>
+                    <span className="text-xs text-danger font-medium">Definir ação</span>
+                  </li>
+                ))}
+              </ul>
+            </HomeSection>
+          )}
+
           {/* Empty state — only when no demands at all */}
-          {urgentDemands.length === 0 && futureDemands.length === 0 && (
+          {urgentDemands.length === 0 && futureDemands.length === 0 && orphanLeads.length === 0 && (
             <div className="rounded-lg border border-border-subtle bg-surface p-4">
               <p className="text-sm text-muted">Nenhuma demanda com data definida.</p>
               <Link

@@ -37,9 +37,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   const campaign = campaignRaw as unknown as DiscoveryCampaignRow;
 
-  // Global extra blocklist (Configurações → Filtro global) supplements the hardcoded
-  // discovery filter and each campaign's own blocked_keywords. Brands are matched the
-  // same way as keywords, so both lists are merged into blocked_keywords below.
   const { data: blocklistRaw } = await supabase
     .from("settings")
     .select("value")
@@ -48,10 +45,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const blocklist = (blocklistRaw as { value: unknown } | null)?.value as
     | { extra_blocked_keywords?: string[]; extra_blocked_brands?: string[] }
     | undefined;
-  const extraBlockedKeywords = [
-    ...(blocklist?.extra_blocked_keywords ?? []),
-    ...(blocklist?.extra_blocked_brands ?? []),
-  ];
+  const extraBlockedKeywords = blocklist?.extra_blocked_keywords ?? [];
+  const extraBlockedBrands = blocklist?.extra_blocked_brands ?? [];
 
   const effectiveCategories = (parsed.data.categories ?? campaign.included_types) as Parameters<
     typeof searchNearbyByCategory
@@ -128,7 +123,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         place,
         {
           excluded_types: campaign.excluded_types,
-          blocked_keywords: [...campaign.blocked_keywords, ...extraBlockedKeywords],
+          blocked_keywords: [...campaign.blocked_keywords, ...extraBlockedKeywords, ...extraBlockedBrands],
           min_rating: campaign.min_rating,
           min_reviews: campaign.min_reviews,
           exclude_franchises: campaign.exclude_franchises,
@@ -141,7 +136,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           isExistingClient: existingLead?.business_status === "client",
           isAlreadyRejected: existingLead?.triage_status === "rejected",
           isAlreadyProspected: Boolean(existingLead) && existingLead?.triage_status !== "pending_review",
-        }
+        },
+        extraBlockedBrands
       );
 
       if (existingLead) {

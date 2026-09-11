@@ -50,6 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       event_type: "stage_changed",
       channel: "system",
       metadata: { from: current.pipeline_stage, to: parsed.data.stage, changed_by: user.id },
+      performed_by: user!.id,
     });
   }
 

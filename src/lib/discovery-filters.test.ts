@@ -16,6 +16,9 @@ const MUST_FAIL: { name: string; types: string[] }[] = [
   { name: "Giraffas", types: ["brazilian_restaurant"] },
   { name: "Assaí Atacadista", types: ["supermarket"] },
   { name: "Casa de Carnes Boi Bom", types: ["store"] }, // açougue-like, no allowlist type/food signal
+  { name: "Cacau Show Mooca", types: ["store"] }, // franchise — must be excluded
+  { name: "Cacau Show", types: ["confectionery"] }, // franchise even with food type
+  { name: "Kopenhagen Shopping Anália Franco", types: ["store"] },
 ];
 
 // §3: these MUST pass (return null) — real independent food businesses.

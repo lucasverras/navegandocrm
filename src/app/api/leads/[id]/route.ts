@@ -59,6 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       event_type: "lead_discarded",
       channel: "system",
       metadata: {},
+      performed_by: user!.id,
     });
   }
 
