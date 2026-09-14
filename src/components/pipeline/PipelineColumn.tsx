@@ -29,9 +29,9 @@ export function PipelineColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex h-full w-full shrink-0 flex-col rounded-lg transition-all md:w-[248px] ${
+      className={`flex min-h-[200px] w-full shrink-0 flex-col rounded-lg transition-colors duration-150 md:w-[248px] ${
         isOver
-          ? "bg-accent-soft/40 ring-2 ring-accent/30"
+          ? "bg-accent-soft/50 ring-2 ring-accent/40"
           : "bg-surface-3/50"
       }`}
     >
