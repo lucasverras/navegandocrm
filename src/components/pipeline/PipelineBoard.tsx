@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -28,10 +28,7 @@ import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
 function groupByStage(leads: LeadRow[]): Record<PipelineStage, LeadRow[]> {
-  const groups = Object.fromEntries(PIPELINE_STAGES.map((s) => [s, [] as LeadRow[]])) as Record<
-    PipelineStage,
-    LeadRow[]
-  >;
+  const groups = Object.fromEntries(PIPELINE_STAGES.map((s) => [s, [] as LeadRow[]])) as Record<PipelineStage, LeadRow[]>;
   for (const lead of leads) {
     const stage = (lead.pipeline_stage && groups[lead.pipeline_stage] ? lead.pipeline_stage : "ready_to_approach") as PipelineStage;
     groups[stage].push(lead);
@@ -59,11 +56,9 @@ export function PipelineBoard({
   const [showArchived, setShowArchived] = useState(false);
   const [pendingClose, setPendingClose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
   const [pendingLose, setPendingLose] = useState<{ lead: LeadRow; snapshot: LeadRow[] } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef<number>(0);
 
-  // Server data is the source of truth after a router.refresh() (e.g. a lead added via the
-  // per-column "Adicionar lead"). Drag/drop mutations never refresh, so this only fires when
-  // fresh data actually arrives — it won't clobber an in-flight optimistic move. Render-time
-  // reconciliation (not an effect) per React's "adjusting state when props change".
   const [prevInitialLeads, setPrevInitialLeads] = useState(initialLeads);
   if (prevInitialLeads !== initialLeads) {
     setPrevInitialLeads(initialLeads);
@@ -79,21 +74,50 @@ export function PipelineBoard({
   const columns = useMemo(() => groupByStage(leads), [leads]);
   const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
+  // ── Auto-scroll: scroll the board container when dragging near edges ──
+  function startAutoScroll(direction: number) {
+    stopAutoScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+    const tick = () => {
+      el.scrollLeft += direction;
+      autoScrollRef.current = requestAnimationFrame(tick);
+    };
+    autoScrollRef.current = requestAnimationFrame(tick);
+  }
+  function stopAutoScroll() {
+    if (autoScrollRef.current) { cancelAnimationFrame(autoScrollRef.current); autoScrollRef.current = 0; }
+  }
+  function handleDragMove(e: { activatorEvent: Event; delta: { x: number; y: number } }) {
+    const el = scrollRef.current;
+    if (!el || !activeId) return;
+    const rect = el.getBoundingClientRect();
+    const pointerX = (e.activatorEvent as PointerEvent).clientX + e.delta.x;
+    const edgeZone = 80;
+    const maxSpeed = 18;
+    if (pointerX < rect.left + edgeZone) {
+      const ratio = 1 - Math.max(0, pointerX - rect.left) / edgeZone;
+      startAutoScroll(-Math.ceil(ratio * maxSpeed));
+    } else if (pointerX > rect.right - edgeZone) {
+      const ratio = 1 - Math.max(0, rect.right - pointerX) / edgeZone;
+      startAutoScroll(Math.ceil(ratio * maxSpeed));
+    } else {
+      stopAutoScroll();
+    }
+  }
+
   function handleDragStart(event: DragStartEvent) {
-    const id = String(event.active.id);
-    console.log("[Pipeline] drag start:", id);
-    setActiveId(id);
+    setActiveId(String(event.active.id));
   }
 
   function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over) return;
-    const activeData = active.data.current as { stage?: PipelineStage; sortable?: { containerId?: string } } | undefined;
+    const activeData = active.data.current as { sortable?: { containerId?: string } } | undefined;
     const overData = over.data.current as { stage?: PipelineStage; sortable?: { containerId?: string } } | undefined;
-    const sourceStage = activeData?.sortable?.containerId ?? activeData?.stage;
+    const sourceContainer = activeData?.sortable?.containerId;
     const destStage = overData?.sortable?.containerId ?? overData?.stage ?? (typeof over.id === "string" && over.id.startsWith("column-") ? over.id.replace("column-", "") : null);
-    if (!sourceStage || !destStage || sourceStage === destStage) return;
-    // Cross-container move during drag for immediate visual feedback
+    if (!sourceContainer || !destStage || sourceContainer === destStage) return;
     setLeads((prev) => {
       const lead = prev.find((l) => l.id === active.id);
       if (!lead || lead.pipeline_stage === destStage) return prev;
@@ -103,11 +127,9 @@ export function PipelineBoard({
 
   async function moveLead(leadId: string, destStage: PipelineStage, destIndex: number) {
     const snapshot = leads;
-
     const source = leads.find((l) => l.id === leadId);
     if (!source) return;
 
-    // Build the new flat array with the lead removed and reinserted.
     const without = leads.filter((l) => l.id !== leadId);
     const destStageItems = without.filter((l) => l.pipeline_stage === destStage);
     const others = without.filter((l) => l.pipeline_stage !== destStage);
@@ -117,8 +139,6 @@ export function PipelineBoard({
     const next = [...others, ...reindexed];
 
     if (destStage === "closed") {
-      // Optimistic move into the closed column visually, but hold the API call
-      // until the confirmation dialog resolves.
       setLeads(next);
       setPendingClose({ lead: { ...source, pipeline_stage: destStage }, snapshot });
       return;
@@ -145,8 +165,8 @@ export function PipelineBoard({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveId(null);
-    if (!over) { console.log("[Pipeline] drag end: no drop target"); return; }
-    console.log("[Pipeline] drag end:", active.id, "→", over.id);
+    stopAutoScroll();
+    if (!over) return;
 
     const activeLead = leads.find((l) => l.id === active.id);
     if (!activeLead) return;
@@ -176,9 +196,13 @@ export function PipelineBoard({
     moveLead(String(active.id), destStage, destIndex);
   }
 
+  function handleDragCancel() {
+    setActiveId(null);
+    stopAutoScroll();
+  }
+
   async function handleMoveTo(lead: LeadRow, stage: PipelineStage) {
-    const destIndex = columns[stage].length;
-    await moveLead(lead.id, stage, destIndex);
+    await moveLead(lead.id, stage, columns[stage].length);
   }
 
   async function handleFollowUp(lead: LeadRow, days: number) {
@@ -265,7 +289,7 @@ export function PipelineBoard({
     if (!pendingLose) return;
     const { lead, snapshot } = pendingLose;
     setPendingLose(null);
-    setLeads((prev) => prev.filter((l) => l.id !== lead.id)); // optimistic — off the board
+    setLeads((prev) => prev.filter((l) => l.id !== lead.id));
     try {
       const res = await fetch(`/api/leads/${lead.id}/lose`, {
         method: "PATCH",
@@ -308,10 +332,15 @@ export function PipelineBoard({
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
-          <div className="flex gap-3 overflow-x-auto rounded-xl bg-surface-2 p-3 pb-3">
+          <div
+            ref={scrollRef}
+            className="flex gap-3 overflow-x-auto scroll-smooth rounded-xl bg-surface-2 p-3 scrollbar-thin"
+          >
             {PIPELINE_STAGES.map((stage) => (
               <div key={stage} className={stage === mobileStage ? "block w-full md:w-auto" : "hidden md:block"}>
                 <PipelineColumn
@@ -340,15 +369,17 @@ export function PipelineBoard({
             ))}
           </div>
 
-          <DragOverlay>
+          <DragOverlay dropAnimation={null}>
             {activeLead ? (
-              <PipelineCard
-                lead={activeLead}
-                regionName={activeLead.region_id ? regionMap[activeLead.region_id] : undefined}
-                onMoveTo={() => {}}
-                onMeetingStatusChange={() => {}}
-                onLose={() => {}}
-              />
+              <div className="rotate-[2deg] scale-105 opacity-90">
+                <PipelineCard
+                  lead={activeLead}
+                  regionName={activeLead.region_id ? regionMap[activeLead.region_id] : undefined}
+                  onMoveTo={() => {}}
+                  onMeetingStatusChange={() => {}}
+                  onLose={() => {}}
+                />
+              </div>
             ) : null}
           </DragOverlay>
         </DndContext>
