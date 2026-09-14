@@ -34,9 +34,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const navItems: NavItem[] = [
     { href: "/hoje", label: "Hoje", icon: "CalendarClock", badge: overdueCount ?? 0 },
     { href: "/prospeccao", label: "Prospecção", icon: "Compass", badge: pendingReviewCount ?? 0 },
+    { href: "/leads", label: "Leads", icon: "Users" },
     { href: "/pipeline", label: "Pipeline", icon: "KanbanSquare" },
     { href: "/resultados", label: "Resultados", icon: "Wallet" },
-    { href: "/historico", label: "Histórico", icon: "History" },
     { href: "/configuracoes", label: "Configurações", icon: "MapPin" },
   ];
 

@@ -75,6 +75,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     event_type: `meeting_${status}`,
     channel: "system",
     metadata: {},
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ ok: true });

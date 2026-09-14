@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
@@ -30,13 +29,13 @@ const STRATEGY_LABEL: Record<string, string> = {
 // MESSAGE STUDIO (V6 §28-31): a mensagem recomendada, POR QUE ela foi criada, ajustes de um
 // clique (mais direta / mais curta / outro case) e refino em linguagem natural — sem virar chat.
 export function MessageStudio({ lead, latestMessage }: { lead: LeadRow; latestMessage: OutreachMessageRow | null }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(latestMessage?.content ?? "");
   const [loading, setLoading] = useState<string | null>(null);
   const [options, setOptions] = useState<MessageOption[] | null>(null);
   const [brief, setBrief] = useState<{ specific_observation?: string; unknowns?: string[] } | null>(null);
   const [wish, setWish] = useState("");
+  const [sent, setSent] = useState(false);
 
   const rationale = (latestMessage?.rationale ?? null) as Rationale | null;
 
@@ -57,7 +56,6 @@ export function MessageStudio({ lead, latestMessage }: { lead: LeadRow; latestMe
     setOptions(null);
     setBrief(null);
     toast.success(successMsg);
-    router.refresh();
     return true;
   }
 
@@ -106,7 +104,6 @@ export function MessageStudio({ lead, latestMessage }: { lead: LeadRow; latestMe
     }
     setEditing(false);
     toast.success("Mensagem atualizada");
-    router.refresh();
   }
 
   async function markSent() {
@@ -120,7 +117,7 @@ export function MessageStudio({ lead, latestMessage }: { lead: LeadRow; latestMe
       return;
     }
     toast.success("Marcado como enviada");
-    router.refresh();
+    setSent(true);
   }
 
   async function copyMessage() {

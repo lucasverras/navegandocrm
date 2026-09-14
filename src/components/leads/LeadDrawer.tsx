@@ -10,7 +10,8 @@ import { WhatsAppButton } from "@/components/leads/WhatsAppButton";
 import { eventLabel } from "@/lib/event-labels";
 import { formatDate, formatHumanDate, daysFromNow } from "@/lib/utils";
 import { BRL } from "@/lib/finance";
-import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS } from "@/types/domain";
+import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS, PIPELINE_STAGES, CONTACT_ROUND_LABELS } from "@/types/domain";
+import type { PipelineStage } from "@/types/domain";
 
 type Summary = {
   lead: {
@@ -38,6 +39,7 @@ type Summary = {
     proposal_value: number | null;
     proposal_note: string | null;
     proposal_sent_at: string | null;
+    contact_round: string | null;
     regions: { neighborhood: string; city: string } | null;
   };
   decisionMaker: { name: string | null; role: string | null; confidence: number } | null;
@@ -56,9 +58,12 @@ const FOLLOW_UP_CHOICES = [
 // O lead drawer (V6 §50): clique em lead abre isto — nunca uma página gigante. Cabeçalho com
 // nome/telefone/WhatsApp/Instagram e seções: próxima ação, notas, decisor, mensagem, reunião,
 // proposta e timeline. Aberto de qualquer lugar via CustomEvent("open-lead-drawer").
+type PartialLead = { name: string; phone?: string | null; instagram_handle?: string | null; instagram_url?: string | null; pipeline_stage?: string | null };
+
 export function LeadDrawer() {
   const [leadId, setLeadId] = useState<string | null>(null);
   const [data, setData] = useState<Summary | null>(null);
+  const [preview, setPreview] = useState<PartialLead | null>(null);
   const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -67,19 +72,20 @@ export function LeadDrawer() {
   const close = useCallback(() => {
     setLeadId(null);
     setData(null);
+    setPreview(null);
     setNotesDraft(null);
   }, []);
 
-  // Re-fetches the summary after a mutation (follow-up, nota) without closing the drawer.
   const reload = useCallback(() => setRefreshTick((t) => t + 1), []);
 
   useEffect(() => {
     function onOpen(e: Event) {
-      const id = (e as CustomEvent<{ leadId: string }>).detail?.leadId;
-      if (id) {
+      const detail = (e as CustomEvent<{ leadId: string } & Partial<PartialLead>>).detail;
+      if (detail?.leadId) {
         setData(null);
         setNotesDraft(null);
-        setLeadId(id);
+        setPreview(detail.name ? detail as PartialLead : null);
+        setLeadId(detail.leadId);
       }
     }
     function onKey(e: KeyboardEvent) {
@@ -158,21 +164,23 @@ export function LeadDrawer() {
         <div className="sticky top-0 z-10 border-b border-border bg-surface/95 p-5 pb-4 backdrop-blur-sm">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              {lead ? (
+              {(lead || preview) ? (
                 <>
-                  <h2 className="truncate font-display text-xl font-bold text-foreground">{lead.name}</h2>
-                  <p className="text-xs text-muted">
-                    {categoryLabel(lead.category)}
-                    {lead.regions ? ` · ${lead.regions.neighborhood}` : ""}
-                    {lead.pipeline_stage
-                      ? ` · ${PIPELINE_STAGE_LABELS[lead.pipeline_stage as keyof typeof PIPELINE_STAGE_LABELS] ?? lead.pipeline_stage}`
-                      : ""}
-                  </p>
+                  <h2 className="truncate font-display text-xl font-bold text-foreground">{lead?.name ?? preview?.name}</h2>
+                  {lead && (
+                    <p className="text-xs text-muted">
+                      {categoryLabel(lead.category)}
+                      {lead.regions ? ` · ${lead.regions.neighborhood}` : ""}
+                      {lead.pipeline_stage
+                        ? ` · ${PIPELINE_STAGE_LABELS[lead.pipeline_stage as keyof typeof PIPELINE_STAGE_LABELS] ?? lead.pipeline_stage}`
+                        : ""}
+                    </p>
+                  )}
                   <p className="mt-1.5 flex flex-wrap items-center gap-x-3 text-sm">
-                    {lead.phone && <span className="tabular-nums text-foreground">{lead.phone}</span>}
-                    {handle && igUrl && (
-                      <a href={igUrl} target="_blank" rel="noreferrer" className="text-accent-2 hover:underline">
-                        @{handle}
+                    {(lead?.phone ?? preview?.phone) && <span className="tabular-nums text-foreground">{lead?.phone ?? preview?.phone}</span>}
+                    {(handle || (!lead && preview?.instagram_handle)) && (igUrl || preview?.instagram_url) && (
+                      <a href={igUrl ?? preview?.instagram_url ?? "#"} target="_blank" rel="noreferrer" className="text-accent-2 hover:underline">
+                        @{handle || preview?.instagram_handle?.replace(/^@/, "")}
                       </a>
                     )}
                   </p>
@@ -275,23 +283,60 @@ export function LeadDrawer() {
               </Section>
             )}
 
+            {/* Commercial data — inline stage change */}
+            <Section title="Comercial">
+              <div className="flex flex-col gap-1 text-sm">
+                <div className="flex items-center justify-between py-0.5">
+                  <span className="text-xs text-muted">Etapa</span>
+                  <select
+                    value={lead.pipeline_stage ?? ""}
+                    onChange={async (e) => {
+                      const stage = e.target.value || null;
+                      setBusy("stage");
+                      const res = await fetch(`/api/leads/${lead.id}/pipeline`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ stage, position: 0 }),
+                      }).catch(() => null);
+                      setBusy(null);
+                      if (!res?.ok) return void toast.error("Erro ao mover");
+                      toast.success(`Movido para ${PIPELINE_STAGE_LABELS[stage as PipelineStage] ?? "Sem etapa"}`);
+                      reload();
+                    }}
+                    disabled={busy === "stage"}
+                    className="rounded border border-border bg-surface px-2 py-0.5 text-xs text-foreground outline-none focus:border-accent"
+                  >
+                    <option value="">Sem etapa</option>
+                    {PIPELINE_STAGES.map((s) => (
+                      <option key={s} value={s}>{PIPELINE_STAGE_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
+                <Row label="Rodada" value={lead.contact_round ? (CONTACT_ROUND_LABELS[lead.contact_round as keyof typeof CONTACT_ROUND_LABELS] ?? lead.contact_round) : "—"} />
+                {lead.meeting_at && <Row label="Reunião" value={formatDate(lead.meeting_at)} />}
+                {lead.proposal_value != null && (
+                  <Row label="Proposta" value={`${BRL.format(lead.proposal_value)}/mês`} />
+                )}
+                {lead.regions && <Row label="Região" value={lead.regions.neighborhood} />}
+              </div>
+            </Section>
+
             <Section title="Notas">
               <textarea
-                rows={3}
+                rows={2}
                 value={notesDraft ?? lead.notes ?? ""}
                 onChange={(e) => setNotesDraft(e.target.value)}
-                placeholder="Anote algo sobre este lead…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    saveNotes();
+                  }
+                }}
+                placeholder="Adicionar nota... (Enter salva)"
                 className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted focus:border-accent"
               />
               {notesDraft != null && notesDraft !== (lead.notes ?? "") && (
-                <button
-                  type="button"
-                  disabled={busy === "notes"}
-                  onClick={saveNotes}
-                  className="mt-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-2 disabled:opacity-50"
-                >
-                  {busy === "notes" ? "Salvando…" : "Salvar nota"}
-                </button>
+                <p className="mt-1 text-[10px] text-muted">Enter para salvar · Shift+Enter nova linha</p>
               )}
             </Section>
 
@@ -331,14 +376,32 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-// Text trigger — renders like a link but opens the drawer (used on demand rows, lists, cards).
-export function LeadDrawerLink({ leadId, children, className }: { leadId: string; children: React.ReactNode; className?: string }) {
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-xs text-muted">{label}</span>
+      <span className="text-xs text-foreground">{value}</span>
+    </div>
+  );
+}
+
+export function LeadDrawerLink({
+  leadId,
+  children,
+  className,
+  preview,
+}: {
+  leadId: string;
+  children: React.ReactNode;
+  className?: string;
+  preview?: Partial<PartialLead>;
+}) {
   return (
     <button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
-        window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId } }));
+        window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId, ...preview } }));
       }}
       className={className ?? "truncate text-left text-sm font-semibold text-foreground transition-colors hover:text-accent-2"}
     >
@@ -347,11 +410,11 @@ export function LeadDrawerLink({ leadId, children, className }: { leadId: string
   );
 }
 
-// Eye button that opens the preview drawer for a lead.
 export function LeadPreviewTrigger({ leadId, className }: { leadId: string; className?: string }) {
   return (
     <button
       type="button"
+      onMouseEnter={() => fetch(`/api/leads/${leadId}`)}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();

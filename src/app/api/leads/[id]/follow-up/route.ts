@@ -30,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     event_type: "follow_up_set",
     channel: "system",
     metadata: { next_follow_up_at: parsed.data.next_follow_up_at },
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ ok: true });

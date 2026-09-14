@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -11,8 +10,8 @@ import type { DecisionMakerRow } from "@/types/database";
 import { UserSearch } from "lucide-react";
 
 export function DecisionMakerPanel({ leadId, decisionMaker }: { leadId: string; decisionMaker: DecisionMakerRow | null }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<DecisionMakerRow | null>(decisionMaker);
 
   async function handleSearch() {
     setLoading(true);
@@ -25,9 +24,11 @@ export function DecisionMakerPanel({ leadId, decisionMaker }: { leadId: string; 
       return;
     }
 
+    if (data.decisionMaker) setResult(data.decisionMaker);
     toast.success(data.decisionMaker?.found ? "Decisor encontrado" : "Nenhum decisor encontrado");
-    router.refresh();
   }
+
+  const dm = result ?? decisionMaker;
 
   return (
     <Card>
@@ -39,64 +40,64 @@ export function DecisionMakerPanel({ leadId, decisionMaker }: { leadId: string; 
         </Button>
       </CardHeader>
       <CardContent>
-        {!decisionMaker ? (
+        {!dm ? (
           <p className="text-sm text-muted">Nenhuma pesquisa realizada ainda.</p>
-        ) : !decisionMaker.found ? (
+        ) : !dm.found ? (
           <p className="text-sm text-muted">
-            Não encontrado em fontes públicas confiáveis (pesquisado em {formatDate(decisionMaker.researched_at)}).
+            Não encontrado em fontes públicas confiáveis (pesquisado em {formatDate(dm.researched_at)}).
           </p>
         ) : (
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-xs text-muted">Nome</dt>
-              <dd>{decisionMaker.name ?? "—"}</dd>
+              <dd>{dm.name ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted">Cargo</dt>
-              <dd>{decisionMaker.role ?? "—"}</dd>
+              <dd>{dm.role ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted">Tipo de contato</dt>
-              <dd>{decisionMaker.contact_type ?? "—"}</dd>
+              <dd>{dm.contact_type ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted">Confiança</dt>
               <dd>
-                <Badge tone={decisionMaker.confidence >= 60 ? "success" : "warning"}>{decisionMaker.confidence}%</Badge>
+                <Badge tone={dm.confidence >= 60 ? "success" : "warning"}>{dm.confidence}%</Badge>
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted">E-mail</dt>
-              <dd>{decisionMaker.email ?? "—"}</dd>
+              <dd>{dm.email ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted">Telefone</dt>
-              <dd>{decisionMaker.phone ?? "—"}</dd>
+              <dd>{dm.phone ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted">LinkedIn</dt>
-              <dd className="truncate">{decisionMaker.linkedin ?? "—"}</dd>
+              <dd className="truncate">{dm.linkedin ?? "—"}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted">Fonte</dt>
               <dd className="truncate">
-                {decisionMaker.source_url ? (
-                  <a href={decisionMaker.source_url} target="_blank" rel="noopener noreferrer" className="text-accent-2 hover:underline">
-                    {decisionMaker.source_title ?? decisionMaker.source_url}
+                {dm.source_url ? (
+                  <a href={dm.source_url} target="_blank" rel="noopener noreferrer" className="text-accent-2 hover:underline">
+                    {dm.source_title ?? dm.source_url}
                   </a>
                 ) : (
                   "—"
                 )}
               </dd>
             </div>
-            {decisionMaker.excerpt && (
+            {dm.excerpt && (
               <div className="sm:col-span-2">
                 <dt className="text-xs text-muted">Trecho</dt>
-                <dd className="text-muted">{decisionMaker.excerpt}</dd>
+                <dd className="text-muted">{dm.excerpt}</dd>
               </div>
             )}
             <div className="sm:col-span-2 text-xs text-muted">
-              Pesquisado em {formatDate(decisionMaker.researched_at)}
+              Pesquisado em {formatDate(dm.researched_at)}
             </div>
           </dl>
         )}

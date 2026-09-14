@@ -96,6 +96,30 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
         ))}
       </div>
 
+      {/* Incomplete clients banner (§44-46) */}
+      {(() => {
+        const incomplete = clients.filter(
+          (c) => !c.initial_monthly_fee || c.initial_monthly_fee === 0 || !c.closed_at
+        );
+        if (incomplete.length === 0) return null;
+        return (
+          <div className="flex items-center justify-between rounded-lg border border-warning/40 bg-warning/5 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {incomplete.length} cliente{incomplete.length > 1 ? "s" : ""} com dados incompletos
+              </p>
+              <p className="text-xs text-muted">Mensalidade ou data de início faltando — afeta cálculos de receita e comissão.</p>
+            </div>
+            <Link
+              href="/resultados?tab=fechados"
+              className="shrink-0 rounded-md border border-warning/40 bg-surface px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/10"
+            >
+              Completar dados
+            </Link>
+          </div>
+        );
+      })()}
+
       {tab === "overview" && (
         <div className="flex flex-col gap-6">
           {/* Dense control strip (§53-54): no giant numbers, just readable data. */}

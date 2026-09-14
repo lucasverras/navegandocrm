@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       event_type: "triage_decision",
       channel: "system",
       metadata: { decision, bulk: true, reviewed_by: user.id },
+      performed_by: user!.id,
     }))
   );
 

@@ -29,13 +29,13 @@ export function PipelineColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex h-full w-full shrink-0 flex-col rounded-lg border transition-all md:w-[264px] ${
+      className={`flex h-full w-full shrink-0 flex-col rounded-lg transition-all md:w-[248px] ${
         isOver
-          ? "border-accent/60 bg-accent-soft/30 ring-2 ring-accent/30"
-          : "border-border/60 bg-surface-2/70"
+          ? "bg-accent-soft/40 ring-2 ring-accent/30"
+          : "bg-surface-3/50"
       }`}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg border-b border-border/40 bg-surface-2 px-3 py-2.5">
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg border-b border-border-subtle bg-surface-3/60 px-3 py-2">
         <span className="text-[13px] font-semibold text-foreground">{PIPELINE_STAGE_LABELS[stage]}</span>
         <span className="rounded-full bg-surface px-1.5 py-0.5 text-[11px] tabular-nums text-muted">{leads.length}</span>
       </div>

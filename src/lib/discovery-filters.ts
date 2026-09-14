@@ -87,6 +87,30 @@ export const DEFAULT_DENYLIST_TYPES = [
   "gym",
   "beauty_salon",
   "furniture_store",
+  "electronics_store",
+  "car_dealer",
+  "auto_parts_store",
+  "car_wash",
+  "car_repair",
+  "car_rental",
+  "parking",
+  "laundry",
+  "dentist",
+  "doctor",
+  "veterinary_care",
+  "bank",
+  "atm",
+  "insurance_agency",
+  "real_estate_agency",
+  "travel_agency",
+  "movie_theater",
+  "church",
+  "mosque",
+  "cemetery",
+  "post_office",
+  "library",
+  "school",
+  "university",
 ] as const;
 
 // Portuguese keywords checked against the establishment name (accent/case-insensitive).
@@ -191,11 +215,38 @@ const KNOWN_FRANCHISE_NAMES = [
   "domino",
   "ragazzo",
   "giraffas",
+  "cacau show",
+  "kopenhagen",
+  "brasil cacau",
+  "chilli beans",
+  "o boticario",
+  "boticário",
+  "natura",
+  "popeyes",
+  "taco bell",
+  "wendy's",
+  "five guys",
+  "panda express",
+  "chick-fil-a",
+  "coco bambu",
+  "madero",
+  "jerônimo",
+  "jeronimo",
+  "applebee",
+  "tony roma",
+  "red lobster",
+  "olive garden",
+  "p.f. chang",
+  "sí señor",
+  "si senor",
+  "bk ",
+  "mc donald",
 ];
 
-export function matchesKnownFranchise(name: string): boolean {
+export function matchesKnownFranchise(name: string, extraBrands: string[] = []): boolean {
   const normalized = normalize(name);
-  return KNOWN_FRANCHISE_NAMES.some((f) => normalized.includes(normalize(f)));
+  const allFranchises = [...KNOWN_FRANCHISE_NAMES, ...extraBrands];
+  return allFranchises.some((f) => normalized.includes(normalize(f)));
 }
 
 export function matchesAllowlistType(types: string[]): boolean {
@@ -216,9 +267,10 @@ export function classifyDiscoveredPlace(input: {
   types: string[];
   excludedTypes?: string[];
   blockedKeywords?: string[];
+  blockedBrands?: string[];
 }): ExclusionReason | null {
   if (matchesDenylistType(input.types, input.excludedTypes ?? [])) return "blocked_category";
-  if (matchesKnownFranchise(input.name)) return "excluded_franchise";
+  if (matchesKnownFranchise(input.name, input.blockedBrands ?? [])) return "excluded_franchise";
   if (matchesBlockedKeyword(input.name, input.blockedKeywords ?? [])) return "blocked_keyword";
   // Allowlist gate: must have at least one allowed type OR a food-signal word in the name.
   if (!matchesAllowlistType(input.types) && !hasFoodSignalWord(input.name)) return "not_food";
@@ -259,20 +311,20 @@ export interface ExistingLeadLookup {
 export function classifyExclusion(
   place: PlaceResult,
   campaign: DiscoveryCampaignFilters,
-  existing: ExistingLeadLookup
+  existing: ExistingLeadLookup,
+  extraBrands?: string[]
 ): ExclusionReason | null {
   if (existing.isDuplicate) return "duplicate";
   if (existing.isExistingClient) return "existing_client";
   if (existing.isAlreadyRejected) return "already_rejected";
   if (existing.isAlreadyProspected) return "already_prospected";
 
-  // Layered type/brand/word/allowlist filter (franchises always blocked). Campaign-specific
-  // excluded_types/blocked_keywords are merged in.
   const layered = classifyDiscoveredPlace({
     name: place.name,
     types: place.types,
     excludedTypes: campaign.excluded_types,
     blockedKeywords: campaign.blocked_keywords,
+    blockedBrands: extraBrands,
   });
   if (layered) return layered;
 

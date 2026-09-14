@@ -46,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: "meeting_scheduled",
     channel: "system",
     metadata: { meeting_at: parsed.data.meeting_at, by: user.id },
+    performed_by: user!.id,
   });
   return NextResponse.json({ ok: true });
 }

@@ -82,6 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: "instagram_found",
     channel: "system",
     metadata: { handle, method },
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ found: true, handle, url, method });

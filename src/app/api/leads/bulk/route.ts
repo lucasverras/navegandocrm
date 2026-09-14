@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   await admin.from("outreach_events").insert(
-    leadIds.map((leadId) => ({ lead_id: leadId, event_type: eventType, channel: "system", metadata }))
+    leadIds.map((leadId) => ({ lead_id: leadId, event_type: eventType, channel: "system", metadata, performed_by: user!.id }))
   );
 
   return NextResponse.json({ ok: true, updated: leadIds.length });

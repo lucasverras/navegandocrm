@@ -57,7 +57,7 @@ export function PipelineCard({
     const target = e.target as HTMLElement;
     if (target.closest("[data-no-navigate]")) return;
     // §50: click opens the side drawer — the board never navigates away.
-    window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId: lead.id } }));
+    window.dispatchEvent(new CustomEvent("open-lead-drawer", { detail: { leadId: lead.id, name: lead.name, phone: lead.phone, instagram_handle: lead.instagram_handle, pipeline_stage: lead.pipeline_stage } }));
   }
   const stopDrag = (e: React.PointerEvent) => e.stopPropagation();
 
@@ -69,7 +69,7 @@ export function PipelineCard({
       style={style}
       onClick={handleCardClick}
       className={cn(
-        "group flex cursor-grab select-none flex-col gap-1.5 rounded-lg border border-border bg-surface p-2.5 text-sm shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all hover:shadow-md active:cursor-grabbing",
+        "group flex cursor-grab select-none flex-col gap-1 rounded-lg border border-border-subtle bg-surface p-2 text-sm shadow-[0_1px_2px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.04)] transition-all hover:shadow-md active:cursor-grabbing",
         isDragging && "scale-[1.02] opacity-60 shadow-lg ring-2 ring-accent/40"
       )}
       {...attributes}

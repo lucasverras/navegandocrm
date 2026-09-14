@@ -41,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     event_type: "triage_decision",
     channel: "system",
     metadata: { decision: parsed.data.decision, reviewed_by: user.id },
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ lead: data });

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Table, THead, TBody, Tr, Th, Td } from "@/components/ui/Table";
@@ -18,47 +17,73 @@ export type Reimb = {
   spent_at: string;
 };
 
+type Action =
+  | { type: "add"; item: Reimb }
+  | { type: "remove"; id: string }
+  | { type: "status"; id: string; status: "pendente" | "recebido" };
+
 export function ReimbursementsPanel({ rows }: { rows: Reimb[] }) {
-  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const [items, dispatch] = useOptimistic(rows, (state, action: Action) => {
+    if (action.type === "add") return [...state, action.item];
+    if (action.type === "remove") return state.filter((r) => r.id !== action.id);
+    if (action.type === "status") return state.map((r) => r.id === action.id ? { ...r, status: action.status } : r);
+    return state;
+  });
 
   async function add() {
     if (!desc.trim() || !amount.trim()) {
       toast.error("Descrição e valor são obrigatórios");
       return;
     }
-    setBusy(true);
-    const res = await fetch("/api/reimbursements", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description: desc.trim(), amount: Number(amount.replace(",", ".")) }),
-    });
-    setBusy(false);
-    if (!res.ok) return toast.error("Erro ao adicionar");
+    const tempId = `temp-${Date.now()}`;
+    const numAmount = Number(amount.replace(",", "."));
+    const optimistic: Reimb = {
+      id: tempId, description: desc.trim(), amount: numAmount,
+      amount_received: 0, status: "pendente", spent_at: new Date().toISOString(),
+    };
     setDesc("");
     setAmount("");
-    toast.success("Reembolso adicionado");
-    router.refresh();
+
+    startTransition(async () => {
+      dispatch({ type: "add", item: optimistic });
+      setBusy(true);
+      const res = await fetch("/api/reimbursements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: optimistic.description, amount: numAmount }),
+      });
+      setBusy(false);
+      if (!res.ok) toast.error("Erro ao adicionar");
+      else toast.success("Reembolso adicionado");
+    });
   }
 
   async function mark(id: string, status: "pendente" | "recebido") {
-    const res = await fetch(`/api/reimbursements/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+    startTransition(async () => {
+      dispatch({ type: "status", id, status });
+      const res = await fetch(`/api/reimbursements/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) toast.error("Erro ao atualizar");
+      else if (status === "recebido") toast.success("Marcado como recebido");
     });
-    if (!res.ok) return toast.error("Erro");
-    router.refresh();
   }
 
   async function remove(id: string) {
     if (!window.confirm("Remover este reembolso?")) return;
-    const res = await fetch(`/api/reimbursements/${id}`, { method: "DELETE" });
-    if (!res.ok) return toast.error("Erro");
-    toast.success("Removido");
-    router.refresh();
+    startTransition(async () => {
+      dispatch({ type: "remove", id });
+      const res = await fetch(`/api/reimbursements/${id}`, { method: "DELETE" });
+      if (!res.ok) toast.error("Erro ao remover");
+      else toast.success("Removido");
+    });
   }
 
   return (
@@ -67,12 +92,14 @@ export function ReimbursementsPanel({ rows }: { rows: Reimb[] }) {
         <input
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
           placeholder="Descrição (ex: Drone, Uber para gravação)"
           className="h-9 flex-1 rounded-md border border-border bg-surface-2 px-2 text-sm text-foreground outline-none focus:border-accent"
         />
         <input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
           inputMode="decimal"
           placeholder="R$"
           className="h-9 w-28 rounded-md border border-border bg-surface-2 px-2 text-sm tabular-nums text-foreground outline-none focus:border-accent"
@@ -82,7 +109,7 @@ export function ReimbursementsPanel({ rows }: { rows: Reimb[] }) {
         </Button>
       </div>
 
-      {rows.length === 0 ? (
+      {items.length === 0 ? (
         <p className="text-sm text-muted">Nenhum reembolso registrado.</p>
       ) : (
         <Table>
@@ -96,7 +123,7 @@ export function ReimbursementsPanel({ rows }: { rows: Reimb[] }) {
             </Tr>
           </THead>
           <TBody>
-            {rows.map((r) => (
+            {items.map((r) => (
               <Tr key={r.id}>
                 <Td className="font-medium text-foreground">{r.description}</Td>
                 <Td className="text-xs">{formatDate(r.spent_at)}</Td>

@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
     event_type: d.as_client ? "client_added_manual" : "lead_created_manual",
     channel: "system",
     metadata: { by: user.id, origin: row.lead_origin ?? "manual" },
+    performed_by: user!.id,
   });
 
   if (d.as_client) {

@@ -114,6 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: `response_${kind}`,
     channel: "whatsapp",
     metadata: { by: user.id, note: parsed.data.note?.trim() || null },
+    performed_by: user!.id,
   });
 
   if (parsed.data.decision_maker_name?.trim()) {

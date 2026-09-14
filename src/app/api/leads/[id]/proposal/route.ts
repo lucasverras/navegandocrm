@@ -54,6 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     event_type: "proposal_sent",
     channel: "system",
     metadata: { value: parsed.data.value ?? null, by: user.id },
+    performed_by: user!.id,
   });
   return NextResponse.json({ ok: true });
 }
@@ -97,6 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     event_type: `proposal_${parsed.data.status}`,
     channel: "system",
     metadata: { by: user.id },
+    performed_by: user!.id,
   });
   return NextResponse.json({ ok: true });
 }

@@ -1,14 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-// Discreet action to find a lead's Instagram handle from its own website (handle-only, no scraping
-// of instagram.com). Shown when no handle is known yet.
 export function FindInstagramButton({ leadId }: { leadId: string }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [found, setFound] = useState<string | null>(null);
 
   async function find() {
     setLoading(true);
@@ -16,11 +13,15 @@ export function FindInstagramButton({ leadId }: { leadId: string }) {
     const data = await res.json().catch(() => ({}));
     setLoading(false);
     if (res.ok && data.found) {
+      setFound(data.handle);
       toast.success(`Instagram encontrado: @${data.handle}`);
-      router.refresh();
     } else {
       toast.message("Instagram não encontrado no site do restaurante");
     }
+  }
+
+  if (found) {
+    return <span className="text-xs text-success">@{found}</span>;
   }
 
   return (

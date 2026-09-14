@@ -31,6 +31,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     event_type: "contact_registered",
     channel: "system",
     metadata: {},
+    performed_by: user!.id,
   });
 
   return NextResponse.json({ ok: true });

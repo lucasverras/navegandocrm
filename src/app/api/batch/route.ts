@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const parsed = analyzeLeadsSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
-  const usage = await checkUsageLimit("haiku_analysis");
+  const usage = await checkUsageLimit("ai_analysis");
   if (!usage.allowed) {
     return NextResponse.json({ error: "Limite diário de análises atingido." }, { status: 429 });
   }
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         event_type: "batch_analysis_queued",
         channel: "system",
         metadata: { batch_id: batch.id },
+        performed_by: user!.id,
       }))
     );
 

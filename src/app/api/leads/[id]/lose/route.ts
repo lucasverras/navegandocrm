@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
       .eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await admin.from("outreach_events").insert({ lead_id: id, event_type: "reactivated", channel: "system", metadata: { by: user.id } });
+    await admin.from("outreach_events").insert({ lead_id: id, event_type: "reactivated", channel: "system", metadata: { by: user.id }, performed_by: user.id });
     return NextResponse.json({ ok: true });
   }
 
@@ -61,6 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     event_type: "lost",
     channel: "system",
     metadata: { reason: parsed.data.reason ?? "Outro", by: user.id },
+    performed_by: user!.id,
   });
   return NextResponse.json({ ok: true });
 }

@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Radar Navegando",
-  description: "Sistema interno de SDR da Navegando MKT",
+  title: { default: "Radar Navegando", template: "%s · Radar Navegando" },
+  description: "CRM de prospecção comercial da Navegando MKT",
 };
 
 export default function RootLayout({

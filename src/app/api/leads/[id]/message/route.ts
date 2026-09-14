@@ -154,9 +154,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
 
   const admin = createAdminClient();
-  const { data: leadRaw } = await admin.from("leads").select("*").eq("id", leadId).single();
+
+  const [{ data: leadRaw }, { data: decisionMakerRaw }] = await Promise.all([
+    admin.from("leads").select("*").eq("id", leadId).single(),
+    admin
+      .from("decision_makers")
+      .select("*")
+      .eq("lead_id", leadId)
+      .eq("found", true)
+      .order("researched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
   if (!leadRaw) return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
   const lead = leadRaw as unknown as LeadRow;
+  const decisionMaker = decisionMakerRaw as unknown as DecisionMakerRow | null;
   const contactRound: ContactRound = lead.contact_round ?? "FIRST_CONTACT";
   const isFollowUp = contactRound !== "FIRST_CONTACT";
   if (lead.triage_status === "rejected" || lead.triage_status === "auto_filtered") {
@@ -169,39 +181,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Persist-picked-message mode: store a user-chosen option verbatim, no AI spend.
   if (parsed.data.content) {
     const chosenVariant = parsed.data.variant ?? "diagnosis";
-    const { data: message } = await admin
-      .from("outreach_messages")
-      .insert({
-        lead_id: leadId,
-        variant: chosenVariant,
-        content: parsed.data.content,
-        original_content: parsed.data.content,
-        model: "picked",
-        input_tokens: 0,
-        output_tokens: 0,
-        estimated_cost_usd: 0,
-        rationale: { variant: chosenVariant, picked: true },
-        contact_round: contactRound,
-        purpose: isFollowUp ? "follow_up" : "initial",
-      })
-      .select()
-      .single();
-    await admin.from("leads").update({ commercial_status: "message_ready" }).eq("id", leadId);
-    // A ready message creates the (undated) "primeira abordagem" demand — unless the lead
-    // already has a scheduled next action (never clobber a follow-up/meeting).
-    await admin.from("leads").update({ next_action_type: "first_approach" }).eq("id", leadId).is("next_action_type", null);
+    const [{ data: message }] = await Promise.all([
+      admin
+        .from("outreach_messages")
+        .insert({
+          lead_id: leadId,
+          variant: chosenVariant,
+          content: parsed.data.content,
+          original_content: parsed.data.content,
+          model: "picked",
+          input_tokens: 0,
+          output_tokens: 0,
+          estimated_cost_usd: 0,
+          rationale: { variant: chosenVariant, picked: true },
+          contact_round: contactRound,
+          purpose: isFollowUp ? "follow_up" : "initial",
+        })
+        .select()
+        .single(),
+      admin.from("leads").update({ commercial_status: "message_ready" }).eq("id", leadId),
+      admin.from("leads").update({ next_action_type: "first_approach" }).eq("id", leadId).is("next_action_type", null),
+    ]);
     return NextResponse.json({ message });
   }
-
-  const { data: decisionMakerRaw } = await admin
-    .from("decision_makers")
-    .select("*")
-    .eq("lead_id", leadId)
-    .eq("found", true)
-    .order("researched_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const decisionMaker = decisionMakerRaw as unknown as DecisionMakerRow | null;
 
   if (decisionMaker?.opted_out) {
     return NextResponse.json({ error: "O decisor deste lead optou por não ser mais contatado (opt-out)." }, { status: 403 });
@@ -218,7 +220,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const instruction = parsed.data.instruction?.trim() || null;
   const refine = !!parsed.data.refine || !!instruction;
-  const usageOperation = refine ? "sonnet_refinement" : "haiku_analysis";
+  const usageOperation = refine ? "ai_refinement" : "ai_analysis";
   const usage = await checkUsageLimit(usageOperation);
   if (!usage.allowed) {
     return NextResponse.json(
@@ -443,7 +445,7 @@ Responda apenas com o texto da mensagem, sem aspas, sem comentários.`;
   await logApiUsage({
     service: "openai",
     model,
-    operation: refine ? "sonnet_refinement" : "message_generation",
+    operation: refine ? "ai_refinement" : "message_generation",
     inputTokens,
     outputTokens,
     estimatedCostUsd: cost,

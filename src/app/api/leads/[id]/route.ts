@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     admin
       .from("leads")
       .select(
-        "id, name, category, phone, website, instagram, instagram_handle, instagram_url, maps_url, google_rating, google_review_count, ai_score, pre_score, pipeline_stage, commercial_status, notes, next_follow_up_at, next_action_type, next_action_at, meeting_at, meeting_link, meeting_note, proposal_value, proposal_note, proposal_sent_at, regions(neighborhood, city)"
+        "id, name, category, phone, website, instagram, instagram_handle, instagram_url, maps_url, google_rating, google_review_count, ai_score, pre_score, pipeline_stage, commercial_status, notes, next_follow_up_at, next_action_type, next_action_at, meeting_at, meeting_link, meeting_note, proposal_value, proposal_note, proposal_sent_at, contact_round, regions(neighborhood, city)"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -59,6 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       event_type: "lead_discarded",
       channel: "system",
       metadata: {},
+      performed_by: user!.id,
     });
   }
 

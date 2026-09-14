@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #faf9f7;
+  --background: #f7f6f3;
   --surface: #ffffff;
-  --surface-2: #f3f2ef;
-  --surface-hover: #ebe9e4;
-  --border: #e7e5e1;
+  --surface-2: #f0eee9;
+  --surface-3: #e8e5df;
+  --surface-hover: #e8e5df;
+  --border: #e0ddd7;
+  --border-subtle: #ebe8e3;
   --foreground: #1a1a18;
   --muted: #6b6660;
   --accent: #c8601f;
   --accent-2: #b8531a;
-  --accent-soft: rgba(200, 96, 31, 0.12);
+  --accent-soft: rgba(200, 96, 31, 0.10);
   --danger: #c14545;
   --success: #2a8055;
   --warning: #a97514;
@@ -20,8 +22,10 @@
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-surface-hover: var(--surface-hover);
   --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
@@ -33,7 +37,7 @@
   --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-jakarta);
-  --radius: 10px;
+  --radius: 8px;
 }
 
 * {
@@ -46,11 +50,15 @@ html {
 
 body {
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(200, 96, 31, 0.08), transparent),
-    radial-gradient(900px 500px at 100% 0%, rgba(228, 128, 47, 0.05), transparent),
+    radial-gradient(1200px 600px at 10% -10%, rgba(200, 96, 31, 0.05), transparent),
+    radial-gradient(900px 500px at 100% 0%, rgba(228, 128, 47, 0.03), transparent),
     var(--background);
   color: var(--foreground);
   min-height: 100vh;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 ::selection {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Input";
@@ -24,11 +23,12 @@ const LABELS: Record<string, string> = {
 };
 
 export function StatusPanel({ leadId, currentStatus }: { leadId: string; currentStatus: string }) {
-  const router = useRouter();
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
 
   async function handleSave() {
+    setSaved("✓ Status atualizado");
     setLoading(true);
     const res = await fetch(`/api/leads/${leadId}/status`, {
       method: "POST",
@@ -37,14 +37,15 @@ export function StatusPanel({ leadId, currentStatus }: { leadId: string; current
     });
     setLoading(false);
     if (!res.ok) {
+      setSaved(null);
       toast.error("Erro ao atualizar status");
       return;
     }
     toast.success("Status atualizado");
-    router.refresh();
   }
 
   async function handleDiscard() {
+    setSaved("✓ Lead descartado");
     setLoading(true);
     const res = await fetch(`/api/leads/${leadId}`, {
       method: "PATCH",
@@ -53,11 +54,11 @@ export function StatusPanel({ leadId, currentStatus }: { leadId: string; current
     });
     setLoading(false);
     if (!res.ok) {
+      setSaved(null);
       toast.error("Erro ao descartar lead");
       return;
     }
     toast.success("Lead descartado");
-    router.refresh();
   }
 
   return (
@@ -66,20 +67,21 @@ export function StatusPanel({ leadId, currentStatus }: { leadId: string; current
         <CardTitle>Status comercial</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setSaved(null); }}>
           {COMMERCIAL_STATUSES.map((s) => (
             <option key={s} value={s}>
               {LABELS[s] ?? s}
             </option>
           ))}
         </Select>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button size="sm" loading={loading} onClick={handleSave}>
             Salvar status
           </Button>
           <Button size="sm" variant="danger" onClick={handleDiscard}>
             Descartar lead
           </Button>
+          {saved && <span className="text-xs text-success">{saved}</span>}
         </div>
       </CardContent>
     </Card>
