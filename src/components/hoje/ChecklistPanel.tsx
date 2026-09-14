@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Check, Plus, Trash2 } from "lucide-react";
 
@@ -35,105 +35,77 @@ export function ChecklistPanel({
   const editRef = useRef<HTMLInputElement>(null);
   const pendingDeletes = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const markBusy = useCallback((id: string) => {
-    setBusyIds((s) => new Set(s).add(id));
-  }, []);
-  const clearBusy = useCallback((id: string) => {
-    setBusyIds((s) => { const n = new Set(s); n.delete(id); return n; });
-  }, []);
+  function markBusy(id: string) { setBusyIds((s) => new Set(s).add(id)); }
+  function clearBusy(id: string) { setBusyIds((s) => { const n = new Set(s); n.delete(id); return n; }); }
 
+  // ── CREATE ──
   async function addItem() {
     const text = newText.trim();
     if (!text) return;
     setNewText("");
-
     const tempId = `temp-${Date.now()}`;
-    const item: Item = {
-      id: tempId, text, lead_id: null, amount: null,
-      due_at: null, type: null, completed_at: null,
-      created_at: new Date().toISOString(),
-    };
-    setPending((prev) => [...prev, item]);
-
-    const res = await fetch("/api/checklists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    }).catch(() => null);
-
-    if (!res?.ok) {
-      setPending((prev) => prev.filter((i) => i.id !== tempId));
+    const item: Item = { id: tempId, text, lead_id: null, amount: null, due_at: null, type: null, completed_at: null, created_at: new Date().toISOString() };
+    setPending((p) => [...p, item]);
+    try {
+      const res = await fetch("/api/checklists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      if (!res.ok) throw new Error(`POST ${res.status}`);
+      const data = await res.json();
+      if (data?.item?.id) setPending((p) => p.map((i) => i.id === tempId ? { ...i, id: data.item.id } : i));
+    } catch (err) {
+      console.error("[Checklist] create failed:", err);
+      setPending((p) => p.filter((i) => i.id !== tempId));
       toast.error("Erro ao criar item");
-      return;
-    }
-    const data = await res.json().catch(() => null);
-    if (data?.item?.id) {
-      setPending((prev) => prev.map((i) => i.id === tempId ? { ...i, id: data.item.id } : i));
     }
   }
 
+  // ── COMPLETE ──
   function completeItem(item: Item) {
     if (busyIds.has(item.id)) return;
     markBusy(item.id);
+    // Optimistic: move to done
+    setPending((p) => p.filter((i) => i.id !== item.id));
+    setDone((d) => [{ ...item, completed_at: new Date().toISOString() }, ...d]);
 
-    setPending((prev) => prev.filter((i) => i.id !== item.id));
-    const completed = { ...item, completed_at: new Date().toISOString() };
-    setDone((prev) => [completed, ...prev]);
+    function rollback() {
+      setDone((d) => d.filter((i) => i.id !== item.id));
+      setPending((p) => [...p, item]);
+      clearBusy(item.id);
+    }
 
-    const undoComplete = () => {
-      setDone((prev) => prev.filter((i) => i.id !== item.id));
-      setPending((prev) => [...prev, { ...item, completed_at: null }]);
-      clearBusy(item.id);
-      fetch(`/api/checklists/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: false }),
-      });
-    };
+    function undoAction() {
+      rollback();
+      fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: false }) })
+        .catch((e) => console.error("[Checklist] undo-complete failed:", e));
+    }
 
-    fetch(`/api/checklists/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed: true }),
-    }).then((res) => {
-      clearBusy(item.id);
-      if (!res?.ok) {
-        undoComplete();
-        toast.error("Não foi possível concluir. Tente novamente.");
-        return;
-      }
-      toast("Checklist concluído", { action: { label: "Desfazer", onClick: undoComplete } });
-    }).catch(() => {
-      clearBusy(item.id);
-      undoComplete();
-      toast.error("Não foi possível concluir. Tente novamente.");
-    });
+    fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: true }) })
+      .then((res) => {
+        clearBusy(item.id);
+        if (!res.ok) { console.error("[Checklist] complete failed:", res.status); rollback(); toast.error("Não foi possível concluir. Tente novamente."); return; }
+        toast("Checklist concluído", { action: { label: "Desfazer", onClick: undoAction } });
+      })
+      .catch((err) => { console.error("[Checklist] complete error:", err); rollback(); toast.error("Não foi possível concluir. Tente novamente."); });
   }
 
+  // ── UNCOMPLETE ──
   function uncompleteItem(item: Item) {
     if (busyIds.has(item.id)) return;
     markBusy(item.id);
-
-    setDone((prev) => prev.filter((i) => i.id !== item.id));
-    setPending((prev) => [...prev, { ...item, completed_at: null }]);
-
-    fetch(`/api/checklists/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed: false }),
-    }).then((res) => {
-      clearBusy(item.id);
-      if (!res?.ok) toast.error("Erro ao desfazer");
-    }).catch(() => { clearBusy(item.id); });
+    setDone((d) => d.filter((i) => i.id !== item.id));
+    setPending((p) => [...p, { ...item, completed_at: null }]);
+    fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: false }) })
+      .then((res) => { clearBusy(item.id); if (!res.ok) console.error("[Checklist] uncomplete failed:", res.status); })
+      .catch((e) => { clearBusy(item.id); console.error("[Checklist] uncomplete error:", e); });
   }
 
-  function deletePendingItem(item: Item) {
-    if (busyIds.has(item.id)) return;
-    setPending((prev) => prev.filter((i) => i.id !== item.id));
+  // ── DELETE (deferred for undo) ──
+  function deleteItem(item: Item, fromDone: boolean) {
+    if (fromDone) setDone((d) => d.filter((i) => i.id !== item.id));
+    else setPending((p) => p.filter((i) => i.id !== item.id));
 
     const timer = setTimeout(() => {
       pendingDeletes.current.delete(item.id);
-      fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch(() => {});
+      fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch((e) => console.error("[Checklist] delete error:", e));
     }, UNDO_WINDOW_MS);
     pendingDeletes.current.set(item.id, timer);
 
@@ -144,69 +116,36 @@ export function ChecklistPanel({
         onClick: () => {
           const t = pendingDeletes.current.get(item.id);
           if (t) { clearTimeout(t); pendingDeletes.current.delete(item.id); }
-          setPending((prev) => [...prev, item]);
+          if (fromDone) setDone((d) => [...d, item]);
+          else setPending((p) => [...p, item]);
         },
       },
     });
   }
 
-  function deleteDoneItem(item: Item) {
-    setDone((prev) => prev.filter((i) => i.id !== item.id));
-
-    const timer = setTimeout(() => {
-      pendingDeletes.current.delete(item.id);
-      fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch(() => {});
-    }, UNDO_WINDOW_MS);
-    pendingDeletes.current.set(item.id, timer);
-
-    toast("Tarefa excluída", {
-      duration: UNDO_WINDOW_MS,
-      action: {
-        label: "Desfazer",
-        onClick: () => {
-          const t = pendingDeletes.current.get(item.id);
-          if (t) { clearTimeout(t); pendingDeletes.current.delete(item.id); }
-          setDone((prev) => [...prev, item]);
-        },
-      },
-    });
-  }
-
-  function startEdit(item: Item) {
-    setEditingId(item.id);
-    setEditText(item.text);
-    setTimeout(() => editRef.current?.focus(), 0);
-  }
-
+  // ── EDIT ──
+  function startEdit(item: Item) { setEditingId(item.id); setEditText(item.text); setTimeout(() => editRef.current?.focus(), 0); }
   async function saveEdit(item: Item) {
     const text = editText.trim();
-    if (!text || text === item.text) {
-      setEditingId(null);
-      return;
-    }
-    setPending((prev) => prev.map((i) => i.id === item.id ? { ...i, text } : i));
+    if (!text || text === item.text) { setEditingId(null); return; }
+    setPending((p) => p.map((i) => i.id === item.id ? { ...i, text } : i));
     setEditingId(null);
-
-    const res = await fetch(`/api/checklists/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    }).catch(() => null);
-    if (!res?.ok) {
-      setPending((prev) => prev.map((i) => i.id === item.id ? { ...i, text: item.text } : i));
+    try {
+      const res = await fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      if (!res.ok) throw new Error(`PATCH ${res.status}`);
+    } catch (err) {
+      console.error("[Checklist] edit failed:", err);
+      setPending((p) => p.map((i) => i.id === item.id ? { ...i, text: item.text } : i));
       toast.error("Erro ao editar");
     }
   }
 
   return (
     <div>
-      {/* Pending items */}
+      {/* ── Pending items ── */}
       <ul className="flex flex-col" role="list">
         {pending.map((item) => (
-          <li
-            key={item.id}
-            className="group flex items-start gap-2.5 border-b border-border/60 py-2 last:border-b-0"
-          >
+          <li key={item.id} className="checklist-item flex items-start gap-2.5 border-b border-border/60 py-2 last:border-b-0">
             <button
               type="button"
               role="checkbox"
@@ -224,36 +163,28 @@ export function ChecklistPanel({
                   ref={editRef}
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveEdit(item);
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(item); if (e.key === "Escape") setEditingId(null); }}
                   onBlur={() => saveEdit(item)}
                   className="w-full bg-transparent text-sm text-foreground outline-none"
                   aria-label="Editar tarefa"
                 />
               ) : (
-                <span
-                  className="text-sm text-foreground cursor-text"
-                  onDoubleClick={() => startEdit(item)}
-                >
+                <span className="text-sm text-foreground cursor-text" onDoubleClick={() => startEdit(item)}>
                   {item.text}
                 </span>
               )}
-              {item.leads?.name && (
-                <span className="ml-1.5 text-xs text-muted">· {item.leads.name}</span>
-              )}
+              {item.leads?.name && <span className="ml-1.5 text-xs text-muted">· {item.leads.name}</span>}
               {item.amount != null && item.amount > 0 && (
                 <span className="ml-1.5 text-xs font-medium tabular-nums text-accent-2">{BRL.format(item.amount)}</span>
               )}
             </div>
             <button
               type="button"
-              onClick={() => deletePendingItem(item)}
+              onClick={(e) => { e.stopPropagation(); deleteItem(item, false); }}
               title="Excluir tarefa"
               aria-label={`Excluir: ${item.text}`}
               tabIndex={0}
-              className="mt-0.5 shrink-0 rounded p-0.5 text-muted opacity-100 transition-all hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+              className="checklist-action mt-0.5 shrink-0 rounded p-0.5 text-muted hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -261,7 +192,7 @@ export function ChecklistPanel({
         ))}
       </ul>
 
-      {/* Quick add */}
+      {/* ── Quick add ── */}
       <div className="mt-2 flex items-center gap-2">
         <Plus className="h-4 w-4 shrink-0 text-muted" />
         <input
@@ -274,7 +205,7 @@ export function ChecklistPanel({
         />
       </div>
 
-      {/* Completed items (collapsed by default) */}
+      {/* ── Completed (collapsed) ── */}
       {done.length > 0 && (
         <details className="mt-3 border-t border-border/60 pt-2">
           <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
@@ -282,7 +213,7 @@ export function ChecklistPanel({
           </summary>
           <ul className="mt-1 flex flex-col" role="list">
             {done.map((item) => (
-              <li key={item.id} className="group flex items-center gap-2.5 py-1.5">
+              <li key={item.id} className="checklist-item flex items-center gap-2.5 py-1.5">
                 <button
                   type="button"
                   role="checkbox"
@@ -298,11 +229,11 @@ export function ChecklistPanel({
                 <span className="flex-1 truncate text-sm text-muted line-through">{item.text}</span>
                 <button
                   type="button"
-                  onClick={() => deleteDoneItem(item)}
+                  onClick={(e) => { e.stopPropagation(); deleteItem(item, true); }}
                   title="Excluir tarefa"
                   aria-label={`Excluir: ${item.text}`}
                   tabIndex={0}
-                  className="rounded p-0.5 text-muted opacity-100 transition-all hover:text-danger focus-visible:ring-2 focus-visible:ring-accent/40 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                  className="checklist-action rounded p-0.5 text-muted hover:text-danger focus-visible:ring-2 focus-visible:ring-accent/40"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

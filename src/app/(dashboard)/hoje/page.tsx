@@ -6,6 +6,7 @@ import { DemandRow } from "@/components/hoje/DemandRow";
 import { ChecklistPanel } from "@/components/hoje/ChecklistPanel";
 import { LeadDrawerLink } from "@/components/leads/LeadDrawer";
 import { BRL } from "@/lib/finance";
+import { HomeReimbs } from "@/components/hoje/HomeReimbs";
 import {
   DEMAND_SELECT,
   actionLine,
@@ -317,28 +318,10 @@ export default async function HojePage() {
             </HomeSection>
           )}
 
-          {/* Reembolsos pendentes */}
-          {reimbs.length > 0 && (
-            <HomeSection title="Reembolsos pendentes">
-              <ul className="flex flex-col">
-                {reimbs.map((r) => {
-                  const pending = r.amount - (r.amount_received ?? 0);
-                  return (
-                    <li key={r.id} className="flex items-center justify-between border-b border-border/60 py-2 last:border-b-0">
-                      <span className="truncate text-sm text-foreground">{r.description}</span>
-                      <span className="shrink-0 text-sm font-medium tabular-nums text-accent-2">{BRL.format(pending)}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-sm">
-                <span className="text-muted">Total</span>
-                <Link href="/resultados?tab=reembolsos" className="font-semibold tabular-nums text-accent-2 hover:underline">
-                  {BRL.format(reimbTotal)}
-                </Link>
-              </div>
-            </HomeSection>
-          )}
+          {/* Reembolsos pendentes — client component with quick-add + mark-received */}
+          <HomeSection title="Reembolsos pendentes">
+            <HomeReimbs initialReimbs={reimbs} />
+          </HomeSection>
         </div>
       </div>
     </div>
