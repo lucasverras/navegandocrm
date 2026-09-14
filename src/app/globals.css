@@ -115,3 +115,11 @@ body {
 .animate-scale-in {
   animation: scale-in 0.15s ease-out;
 }
+
+/* Checklist hover-delete: bulletproof CSS, no Tailwind variant stacking. */
+.checklist-item .checklist-action { opacity: 0; transition: opacity 0.15s; }
+.checklist-item:hover .checklist-action,
+.checklist-item:focus-within .checklist-action { opacity: 1; }
+@media (max-width: 767px) {
+  .checklist-item .checklist-action { opacity: 1; }
+}
