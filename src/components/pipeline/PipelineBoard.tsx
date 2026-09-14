@@ -12,6 +12,7 @@ import {
   closestCorners,
   type DragEndEvent,
   type DragStartEvent,
+  type DragOverEvent,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { toast } from "sonner";
@@ -79,7 +80,25 @@ export function PipelineBoard({
   const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveId(String(event.active.id));
+    const id = String(event.active.id);
+    console.log("[Pipeline] drag start:", id);
+    setActiveId(id);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event;
+    if (!over) return;
+    const activeData = active.data.current as { stage?: PipelineStage; sortable?: { containerId?: string } } | undefined;
+    const overData = over.data.current as { stage?: PipelineStage; sortable?: { containerId?: string } } | undefined;
+    const sourceStage = activeData?.sortable?.containerId ?? activeData?.stage;
+    const destStage = overData?.sortable?.containerId ?? overData?.stage ?? (typeof over.id === "string" && over.id.startsWith("column-") ? over.id.replace("column-", "") : null);
+    if (!sourceStage || !destStage || sourceStage === destStage) return;
+    // Cross-container move during drag for immediate visual feedback
+    setLeads((prev) => {
+      const lead = prev.find((l) => l.id === active.id);
+      if (!lead || lead.pipeline_stage === destStage) return prev;
+      return prev.map((l) => l.id === active.id ? { ...l, pipeline_stage: destStage as PipelineStage } : l);
+    });
   }
 
   async function moveLead(leadId: string, destStage: PipelineStage, destIndex: number) {
@@ -126,7 +145,8 @@ export function PipelineBoard({
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveId(null);
-    if (!over) return;
+    if (!over) { console.log("[Pipeline] drag end: no drop target"); return; }
+    console.log("[Pipeline] drag end:", active.id, "→", over.id);
 
     const activeLead = leads.find((l) => l.id === active.id);
     if (!activeLead) return;
@@ -288,6 +308,7 @@ export function PipelineBoard({
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-3 overflow-x-auto rounded-xl bg-surface-2 p-3 pb-3">
