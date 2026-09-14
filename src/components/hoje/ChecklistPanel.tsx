@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Check, Plus, Trash2 } from "lucide-react";
 
@@ -25,90 +25,135 @@ export function ChecklistPanel({
   initialPending: Item[];
   initialDone: Item[];
 }) {
-  const [, startTransition] = useTransition();
+  const [pending, setPending] = useState<Item[]>(initialPending);
+  const [done, setDone] = useState<Item[]>(initialDone);
   const [newText, setNewText] = useState("");
-  const [pending, addOptimistic] = useOptimistic(initialPending, (state, action: { type: "add"; item: Item } | { type: "remove"; id: string }) => {
-    if (action.type === "add") return [...state, action.item];
-    return state.filter((i) => i.id !== action.id);
-  });
-  const [done, addDoneOptimistic] = useOptimistic(initialDone, (state, action: { type: "add"; item: Item } | { type: "remove"; id: string }) => {
-    if (action.type === "add") return [action.item, ...state];
-    return state.filter((i) => i.id !== action.id);
-  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
 
   async function addItem() {
     const text = newText.trim();
-    if (text.length < 1) return;
+    if (!text) return;
     setNewText("");
 
     const tempId = `temp-${Date.now()}`;
-    const optimisticItem: Item = {
-      id: tempId,
-      text,
-      lead_id: null,
-      amount: null,
-      due_at: null,
-      type: null,
-      completed_at: null,
+    const item: Item = {
+      id: tempId, text, lead_id: null, amount: null,
+      due_at: null, type: null, completed_at: null,
       created_at: new Date().toISOString(),
     };
+    setPending((prev) => [...prev, item]);
 
-    startTransition(async () => {
-      addOptimistic({ type: "add", item: optimisticItem });
-      const res = await fetch("/api/checklists", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      }).catch(() => null);
-      if (!res?.ok) toast.error("Erro ao criar item");
-      // Optimistic UI already updated — no router.refresh() needed.
-    });
+    const res = await fetch("/api/checklists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).catch(() => null);
+
+    if (!res?.ok) {
+      setPending((prev) => prev.filter((i) => i.id !== tempId));
+      toast.error("Erro ao criar item");
+      return;
+    }
+    const data = await res.json().catch(() => null);
+    if (data?.item?.id) {
+      setPending((prev) => prev.map((i) => i.id === tempId ? { ...i, id: data.item.id } : i));
+    }
   }
 
-  async function toggleComplete(item: Item) {
-    const completing = !item.completed_at;
+  function completeItem(item: Item) {
+    setPending((prev) => prev.filter((i) => i.id !== item.id));
+    const completed = { ...item, completed_at: new Date().toISOString() };
+    setDone((prev) => [completed, ...prev]);
 
-    startTransition(async () => {
-      if (completing) {
-        addOptimistic({ type: "remove", id: item.id });
-        addDoneOptimistic({ type: "add", item: { ...item, completed_at: new Date().toISOString() } });
-      } else {
-        addDoneOptimistic({ type: "remove", id: item.id });
-        addOptimistic({ type: "add", item: { ...item, completed_at: null } });
-      }
-
-      const res = await fetch(`/api/checklists/${item.id}`, {
+    const undoComplete = () => {
+      setDone((prev) => prev.filter((i) => i.id !== item.id));
+      setPending((prev) => [...prev, { ...item, completed_at: null }]);
+      fetch(`/api/checklists/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: completing }),
-      }).catch(() => null);
+        body: JSON.stringify({ completed: false }),
+      });
+    };
 
+    fetch(`/api/checklists/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed: true }),
+    }).then((res) => {
       if (!res?.ok) {
-        toast.error("Erro ao atualizar");
-      } else if (completing) {
-        toast("Item concluído", {
-          action: {
-            label: "Desfazer",
-            onClick: () => {
-              fetch(`/api/checklists/${item.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ completed: false }),
-              });
-            },
-          },
-        });
+        undoComplete();
+        toast.error("Não foi possível concluir. Tente novamente.");
+        return;
       }
-      // Optimistic UI already updated — no router.refresh() needed.
+      toast("Checklist concluído", { action: { label: "Desfazer", onClick: undoComplete } });
+    }).catch(() => {
+      undoComplete();
+      toast.error("Não foi possível concluir. Tente novamente.");
     });
   }
 
-  async function deleteItem(id: string) {
-    startTransition(async () => {
-      addDoneOptimistic({ type: "remove", id });
-      await fetch(`/api/checklists/${id}`, { method: "DELETE" }).catch(() => null);
-      // Optimistic UI already updated — no router.refresh() needed.
+  function uncompleteItem(item: Item) {
+    setDone((prev) => prev.filter((i) => i.id !== item.id));
+    setPending((prev) => [...prev, { ...item, completed_at: null }]);
+
+    fetch(`/api/checklists/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completed: false }),
+    }).then((res) => {
+      if (!res?.ok) toast.error("Erro ao desfazer");
+    }).catch(() => {});
+  }
+
+  function deletePendingItem(item: Item) {
+    setPending((prev) => prev.filter((i) => i.id !== item.id));
+
+    const undoDelete = () => {
+      setPending((prev) => [...prev, item]);
+      fetch(`/api/checklists/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: item.text }),
+      });
+    };
+
+    toast("Checklist excluído", { action: { label: "Desfazer", onClick: undoDelete } });
+    fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch(() => {
+      undoDelete();
     });
+  }
+
+  function deleteDoneItem(id: string) {
+    setDone((prev) => prev.filter((i) => i.id !== id));
+    fetch(`/api/checklists/${id}`, { method: "DELETE" }).catch(() => {});
+  }
+
+  function startEdit(item: Item) {
+    setEditingId(item.id);
+    setEditText(item.text);
+    setTimeout(() => editRef.current?.focus(), 0);
+  }
+
+  async function saveEdit(item: Item) {
+    const text = editText.trim();
+    if (!text || text === item.text) {
+      setEditingId(null);
+      return;
+    }
+    setPending((prev) => prev.map((i) => i.id === item.id ? { ...i, text } : i));
+    setEditingId(null);
+
+    const res = await fetch(`/api/checklists/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      setPending((prev) => prev.map((i) => i.id === item.id ? { ...i, text: item.text } : i));
+      toast.error("Erro ao editar");
+    }
   }
 
   return (
@@ -116,16 +161,39 @@ export function ChecklistPanel({
       {/* Pending items */}
       <ul className="flex flex-col">
         {pending.map((item) => (
-          <li key={item.id} className="group flex items-start gap-2.5 border-b border-border/60 py-2 last:border-b-0">
+          <li
+            key={item.id}
+            className="group flex items-start gap-2.5 border-b border-border/60 py-2 last:border-b-0"
+          >
             <button
               type="button"
-              onClick={() => toggleComplete(item)}
-              className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border text-transparent transition-colors hover:border-accent hover:text-accent-2"
+              onClick={() => completeItem(item)}
+              aria-label="Concluir"
+              className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border text-transparent transition-colors hover:border-accent hover:text-accent-2 focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               <Check className="h-3 w-3" />
             </button>
             <div className="min-w-0 flex-1">
-              <span className="text-sm text-foreground">{item.text}</span>
+              {editingId === item.id ? (
+                <input
+                  ref={editRef}
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveEdit(item);
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  onBlur={() => saveEdit(item)}
+                  className="w-full bg-transparent text-sm text-foreground outline-none"
+                />
+              ) : (
+                <span
+                  className="text-sm text-foreground cursor-text"
+                  onDoubleClick={() => startEdit(item)}
+                >
+                  {item.text}
+                </span>
+              )}
               {item.leads?.name && (
                 <span className="ml-1.5 text-xs text-muted">· {item.leads.name}</span>
               )}
@@ -133,6 +201,16 @@ export function ChecklistPanel({
                 <span className="ml-1.5 text-xs font-medium tabular-nums text-accent-2">{BRL.format(item.amount)}</span>
               )}
             </div>
+            {/* Delete on hover — desktop; always visible on mobile */}
+            <button
+              type="button"
+              onClick={() => deletePendingItem(item)}
+              title="Excluir"
+              aria-label="Excluir"
+              className="mt-0.5 shrink-0 text-muted opacity-100 transition-opacity hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40 md:opacity-0 md:group-hover:opacity-100"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </li>
         ))}
       </ul>
@@ -149,7 +227,7 @@ export function ChecklistPanel({
         />
       </div>
 
-      {/* Recently done (collapsed) */}
+      {/* Completed items (collapsed) */}
       {done.length > 0 && (
         <details className="mt-3 border-t border-border/60 pt-2">
           <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
@@ -160,8 +238,9 @@ export function ChecklistPanel({
               <li key={item.id} className="group flex items-center gap-2.5 py-1.5">
                 <button
                   type="button"
-                  onClick={() => toggleComplete(item)}
+                  onClick={() => uncompleteItem(item)}
                   title="Desfazer"
+                  aria-label="Desfazer conclusão"
                   className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border bg-accent-soft text-accent-2"
                 >
                   <Check className="h-3 w-3" />
@@ -169,8 +248,10 @@ export function ChecklistPanel({
                 <span className="flex-1 truncate text-sm text-muted line-through">{item.text}</span>
                 <button
                   type="button"
-                  onClick={() => deleteItem(item.id)}
-                  className="text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                  onClick={() => deleteDoneItem(item.id)}
+                  title="Excluir"
+                  aria-label="Excluir"
+                  className="text-muted opacity-100 transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
