@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { Check, Plus, Trash2 } from "lucide-react";
 
@@ -17,6 +17,7 @@ type Item = {
 };
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const UNDO_WINDOW_MS = 5000;
 
 export function ChecklistPanel({
   initialPending,
@@ -30,7 +31,16 @@ export function ChecklistPanel({
   const [newText, setNewText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const editRef = useRef<HTMLInputElement>(null);
+  const pendingDeletes = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const markBusy = useCallback((id: string) => {
+    setBusyIds((s) => new Set(s).add(id));
+  }, []);
+  const clearBusy = useCallback((id: string) => {
+    setBusyIds((s) => { const n = new Set(s); n.delete(id); return n; });
+  }, []);
 
   async function addItem() {
     const text = newText.trim();
@@ -63,6 +73,9 @@ export function ChecklistPanel({
   }
 
   function completeItem(item: Item) {
+    if (busyIds.has(item.id)) return;
+    markBusy(item.id);
+
     setPending((prev) => prev.filter((i) => i.id !== item.id));
     const completed = { ...item, completed_at: new Date().toISOString() };
     setDone((prev) => [completed, ...prev]);
@@ -70,6 +83,7 @@ export function ChecklistPanel({
     const undoComplete = () => {
       setDone((prev) => prev.filter((i) => i.id !== item.id));
       setPending((prev) => [...prev, { ...item, completed_at: null }]);
+      clearBusy(item.id);
       fetch(`/api/checklists/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -82,6 +96,7 @@ export function ChecklistPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ completed: true }),
     }).then((res) => {
+      clearBusy(item.id);
       if (!res?.ok) {
         undoComplete();
         toast.error("Não foi possível concluir. Tente novamente.");
@@ -89,12 +104,16 @@ export function ChecklistPanel({
       }
       toast("Checklist concluído", { action: { label: "Desfazer", onClick: undoComplete } });
     }).catch(() => {
+      clearBusy(item.id);
       undoComplete();
       toast.error("Não foi possível concluir. Tente novamente.");
     });
   }
 
   function uncompleteItem(item: Item) {
+    if (busyIds.has(item.id)) return;
+    markBusy(item.id);
+
     setDone((prev) => prev.filter((i) => i.id !== item.id));
     setPending((prev) => [...prev, { ...item, completed_at: null }]);
 
@@ -103,31 +122,54 @@ export function ChecklistPanel({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ completed: false }),
     }).then((res) => {
+      clearBusy(item.id);
       if (!res?.ok) toast.error("Erro ao desfazer");
-    }).catch(() => {});
+    }).catch(() => { clearBusy(item.id); });
   }
 
   function deletePendingItem(item: Item) {
+    if (busyIds.has(item.id)) return;
     setPending((prev) => prev.filter((i) => i.id !== item.id));
 
-    const undoDelete = () => {
-      setPending((prev) => [...prev, item]);
-      fetch(`/api/checklists/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: item.text }),
-      });
-    };
+    const timer = setTimeout(() => {
+      pendingDeletes.current.delete(item.id);
+      fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch(() => {});
+    }, UNDO_WINDOW_MS);
+    pendingDeletes.current.set(item.id, timer);
 
-    toast("Checklist excluído", { action: { label: "Desfazer", onClick: undoDelete } });
-    fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch(() => {
-      undoDelete();
+    toast("Tarefa excluída", {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          const t = pendingDeletes.current.get(item.id);
+          if (t) { clearTimeout(t); pendingDeletes.current.delete(item.id); }
+          setPending((prev) => [...prev, item]);
+        },
+      },
     });
   }
 
-  function deleteDoneItem(id: string) {
-    setDone((prev) => prev.filter((i) => i.id !== id));
-    fetch(`/api/checklists/${id}`, { method: "DELETE" }).catch(() => {});
+  function deleteDoneItem(item: Item) {
+    setDone((prev) => prev.filter((i) => i.id !== item.id));
+
+    const timer = setTimeout(() => {
+      pendingDeletes.current.delete(item.id);
+      fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch(() => {});
+    }, UNDO_WINDOW_MS);
+    pendingDeletes.current.set(item.id, timer);
+
+    toast("Tarefa excluída", {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          const t = pendingDeletes.current.get(item.id);
+          if (t) { clearTimeout(t); pendingDeletes.current.delete(item.id); }
+          setDone((prev) => [...prev, item]);
+        },
+      },
+    });
   }
 
   function startEdit(item: Item) {
@@ -159,7 +201,7 @@ export function ChecklistPanel({
   return (
     <div>
       {/* Pending items */}
-      <ul className="flex flex-col">
+      <ul className="flex flex-col" role="list">
         {pending.map((item) => (
           <li
             key={item.id}
@@ -167,9 +209,12 @@ export function ChecklistPanel({
           >
             <button
               type="button"
+              role="checkbox"
+              aria-checked="false"
+              aria-label={`Concluir: ${item.text}`}
+              disabled={busyIds.has(item.id)}
               onClick={() => completeItem(item)}
-              aria-label="Concluir"
-              className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border text-transparent transition-colors hover:border-accent hover:text-accent-2 focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border text-transparent transition-colors hover:border-accent hover:text-accent-2 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
             >
               <Check className="h-3 w-3" />
             </button>
@@ -185,6 +230,7 @@ export function ChecklistPanel({
                   }}
                   onBlur={() => saveEdit(item)}
                   className="w-full bg-transparent text-sm text-foreground outline-none"
+                  aria-label="Editar tarefa"
                 />
               ) : (
                 <span
@@ -201,13 +247,13 @@ export function ChecklistPanel({
                 <span className="ml-1.5 text-xs font-medium tabular-nums text-accent-2">{BRL.format(item.amount)}</span>
               )}
             </div>
-            {/* Delete on hover — desktop; always visible on mobile */}
             <button
               type="button"
               onClick={() => deletePendingItem(item)}
-              title="Excluir"
-              aria-label="Excluir"
-              className="mt-0.5 shrink-0 text-muted opacity-100 transition-opacity hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40 md:opacity-0 md:group-hover:opacity-100"
+              title="Excluir tarefa"
+              aria-label={`Excluir: ${item.text}`}
+              tabIndex={0}
+              className="mt-0.5 shrink-0 rounded p-0.5 text-muted opacity-100 transition-all hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -223,35 +269,40 @@ export function ChecklistPanel({
           onChange={(e) => setNewText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addItem()}
           placeholder="Adicionar item..."
+          aria-label="Adicionar item ao checklist"
           className="h-8 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted"
         />
       </div>
 
-      {/* Completed items (collapsed) */}
+      {/* Completed items (collapsed by default) */}
       {done.length > 0 && (
         <details className="mt-3 border-t border-border/60 pt-2">
           <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
-            {done.length} concluído{done.length > 1 ? "s" : ""}
+            Concluídos ({done.length})
           </summary>
-          <ul className="mt-1 flex flex-col">
+          <ul className="mt-1 flex flex-col" role="list">
             {done.map((item) => (
               <li key={item.id} className="group flex items-center gap-2.5 py-1.5">
                 <button
                   type="button"
+                  role="checkbox"
+                  aria-checked="true"
+                  aria-label={`Desfazer conclusão: ${item.text}`}
+                  disabled={busyIds.has(item.id)}
                   onClick={() => uncompleteItem(item)}
-                  title="Desfazer"
-                  aria-label="Desfazer conclusão"
-                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border bg-accent-soft text-accent-2"
+                  title="Desfazer conclusão"
+                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border bg-accent-soft text-accent-2 disabled:opacity-50"
                 >
                   <Check className="h-3 w-3" />
                 </button>
                 <span className="flex-1 truncate text-sm text-muted line-through">{item.text}</span>
                 <button
                   type="button"
-                  onClick={() => deleteDoneItem(item.id)}
-                  title="Excluir"
-                  aria-label="Excluir"
-                  className="text-muted opacity-100 transition-opacity hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                  onClick={() => deleteDoneItem(item)}
+                  title="Excluir tarefa"
+                  aria-label={`Excluir: ${item.text}`}
+                  tabIndex={0}
+                  className="rounded p-0.5 text-muted opacity-100 transition-all hover:text-danger focus-visible:ring-2 focus-visible:ring-accent/40 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
