@@ -59,6 +59,18 @@ test("comissão legado: 10% de R$4.000 = R$400/mês, base sempre a inicial (§44
   };
   assert.equal(commissionGenerated(legacy), 400); // nunca 500
   assert.equal(commissionGenerated({ ...legacy, legacy_months_paid: 2 }), 800);
+  // Auto-calculate: Feb→Sep 2026 = 8 months, 10% of 3000 = 300/month = 2400
+  const auto: ClientFinance = {
+    ...base,
+    commission_type: "legacy_recurring",
+    commission_percent: 10,
+    initial_monthly_fee: 3000,
+    current_monthly_fee: 3000,
+    legacy_months_paid: 0,
+    closed_at: "2026-02-04T00:00:00Z",
+  };
+  const sep2026 = new Date("2026-09-15T12:00:00Z");
+  assert.equal(commissionGenerated(auto, sep2026), 2400); // 8 months × 300
 });
 
 test("MRR ativo soma mensalidade atual só dos ativos", () => {

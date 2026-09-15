@@ -65,14 +65,21 @@ export function receitaGerada(c: ClientFinance, now: Date = new Date()): number 
 }
 
 // Commission the client has GENERATED so far. Base is ALWAYS the initial monthly fee.
-export function commissionGenerated(c: ClientFinance): number {
+// For legacy_recurring: auto-calculate months from closed_at to now (or churned_at).
+// legacy_months_paid is only used as an override if > 0 (backward compat).
+export function commissionGenerated(c: ClientFinance, now: Date = new Date()): number {
   const pct = (c.commission_percent ?? 0) / 100;
   const base = c.initial_monthly_fee ?? 0;
   switch (c.commission_type) {
     case "one_time_percentage":
       return c.first_payment_paid ? pct * base : 0;
-    case "legacy_recurring":
-      return pct * base * (c.legacy_months_paid ?? 0);
+    case "legacy_recurring": {
+      if (!c.closed_at) return 0;
+      const months = c.legacy_months_paid > 0
+        ? c.legacy_months_paid
+        : monthsBetween(c.closed_at, (c.churned_at ?? now.toISOString()));
+      return pct * base * months;
+    }
     default:
       return 0;
   }
