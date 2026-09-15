@@ -3,7 +3,8 @@
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
-import { MessageCircle, Search } from "lucide-react";
+import { MessageCircle, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/Badge";
 import { LeadDrawerLink } from "@/components/leads/LeadDrawer";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
@@ -42,6 +43,7 @@ type CRMLead = {
   website: string | null;
   notes: string | null;
   archived_at: string | null;
+  lead_origin: string;
   regionName: string | null;
   decisionMaker: { name: string | null; role: string | null } | null;
 };
@@ -176,6 +178,15 @@ export function LeadsCRM({
           {PIPELINE_STAGES.map((s) => (
             <option key={s} value={s}>{PIPELINE_STAGE_LABELS[s]}</option>
           ))}
+        </select>
+        <select
+          className={selectClass}
+          value={searchParams.get("source") ?? ""}
+          onChange={(e) => set({ source: e.target.value || null })}
+        >
+          <option value="">Origem</option>
+          <option value="manual">Meus leads</option>
+          <option value="radar">Buscados</option>
         </select>
         <select
           className={selectClass}
@@ -357,6 +368,28 @@ export function LeadsCRM({
                             <IgGlyph />
                           </a>
                         )}
+                        <button
+                          type="button"
+                          title="Excluir"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!window.confirm(`Excluir "${lead.name}"?`)) return;
+                            const res = await fetch(`/api/leads/${lead.id}/lose`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ reason: "Excluído manualmente" }),
+                            });
+                            if (res.ok) {
+                              toast.success("Lead excluído");
+                              router.refresh();
+                            } else {
+                              toast.error("Erro ao excluir");
+                            }
+                          }}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
