@@ -37,7 +37,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   // waterfall of 5 round-trips. `notFound()` still gates on the lead after they resolve.
   const [{ data: leadData }, { data: analysisRaw }, { data: decisionMakerRaw }, { data: latestMessageRaw }, { data: eventsRaw }] =
     await Promise.all([
-      supabase.from("leads").select("*, regions(id, neighborhood, city)").eq("id", id).single(),
+      supabase.from("leads").select("*, regions(id, neighborhood, city)").eq("id", id).maybeSingle(),
       supabase.from("lead_analysis").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("decision_makers").select("*").eq("lead_id", id).order("researched_at", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("outreach_messages").select("*").eq("lead_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
