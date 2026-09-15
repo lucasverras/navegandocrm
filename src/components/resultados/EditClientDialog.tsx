@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
-import { Pencil, X } from "lucide-react";
+import { Pencil, X, Trash2 } from "lucide-react";
 
 type ClientData = {
   id: string;
@@ -179,13 +179,31 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 border-t border-border pt-3">
-                <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>
-                  Cancelar
+              <div className="flex items-center justify-between border-t border-border pt-3">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={async () => {
+                    if (!window.confirm(`Remover "${client.name}" dos resultados? O lead será arquivado.`)) return;
+                    setSaving(true);
+                    const res = await fetch(`/api/leads/${client.id}/client`, { method: "DELETE" });
+                    setSaving(false);
+                    if (!res.ok) { toast.error("Erro ao remover"); return; }
+                    toast.success("Cliente removido dos resultados");
+                    setOpen(false);
+                    router.refresh();
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" /> Excluir
                 </Button>
-                <Button size="sm" loading={saving} onClick={save}>
-                  Salvar
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => setOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" loading={saving} onClick={save}>
+                    Salvar
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
