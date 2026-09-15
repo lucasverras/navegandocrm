@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 import { Check, Plus, Trash2 } from "lucide-react";
+import { createChecklist, completeChecklist, editChecklist, deleteChecklist } from "@/app/(dashboard)/hoje/actions";
 
 type Item = {
   id: string;
@@ -17,7 +18,6 @@ type Item = {
 };
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const UNDO_WINDOW_MS = 5000;
 
 export function ChecklistPanel({
   initialPending,
@@ -33,12 +33,10 @@ export function ChecklistPanel({
   const [editText, setEditText] = useState("");
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const editRef = useRef<HTMLInputElement>(null);
-  const pendingDeletes = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   function markBusy(id: string) { setBusyIds((s) => new Set(s).add(id)); }
   function clearBusy(id: string) { setBusyIds((s) => { const n = new Set(s); n.delete(id); return n; }); }
 
-  // ── CREATE ──
   async function addItem() {
     const text = newText.trim();
     if (!text) return;
@@ -46,95 +44,85 @@ export function ChecklistPanel({
     const tempId = `temp-${Date.now()}`;
     const item: Item = { id: tempId, text, lead_id: null, amount: null, due_at: null, type: null, completed_at: null, created_at: new Date().toISOString() };
     setPending((p) => [...p, item]);
-    try {
-      const res = await fetch("/api/checklists", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-      if (!res.ok) throw new Error(`POST ${res.status}`);
-      const data = await res.json();
-      if (data?.item?.id) setPending((p) => p.map((i) => i.id === tempId ? { ...i, id: data.item.id } : i));
-    } catch (err) {
-      console.error("[Checklist] create failed:", err);
+
+    const result = await createChecklist(text);
+    if (result.error) {
       setPending((p) => p.filter((i) => i.id !== tempId));
-      toast.error("Erro ao criar item");
+      toast.error(result.error);
+    } else if (result.item) {
+      setPending((p) => p.map((i) => i.id === tempId ? { ...i, id: result.item.id } : i));
     }
   }
 
-  // ── COMPLETE ──
-  function completeItem(item: Item) {
+  async function handleComplete(item: Item) {
     if (busyIds.has(item.id)) return;
     markBusy(item.id);
-    // Optimistic: move to done
     setPending((p) => p.filter((i) => i.id !== item.id));
     setDone((d) => [{ ...item, completed_at: new Date().toISOString() }, ...d]);
 
-    function rollback() {
+    const result = await completeChecklist(item.id, true);
+    clearBusy(item.id);
+    if (result.error) {
       setDone((d) => d.filter((i) => i.id !== item.id));
       setPending((p) => [...p, item]);
-      clearBusy(item.id);
+      toast.error("Não foi possível concluir.");
+    } else {
+      toast("Checklist concluído", {
+        action: {
+          label: "Desfazer",
+          onClick: async () => {
+            setDone((d) => d.filter((i) => i.id !== item.id));
+            setPending((p) => [...p, { ...item, completed_at: null }]);
+            await completeChecklist(item.id, false);
+          },
+        },
+      });
     }
-
-    function undoAction() {
-      rollback();
-      fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: false }) })
-        .catch((e) => console.error("[Checklist] undo-complete failed:", e));
-    }
-
-    fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: true }) })
-      .then((res) => {
-        clearBusy(item.id);
-        if (!res.ok) { console.error("[Checklist] complete failed:", res.status); rollback(); toast.error("Não foi possível concluir. Tente novamente."); return; }
-        toast("Checklist concluído", { action: { label: "Desfazer", onClick: undoAction } });
-      })
-      .catch((err) => { console.error("[Checklist] complete error:", err); rollback(); toast.error("Não foi possível concluir. Tente novamente."); });
   }
 
-  // ── UNCOMPLETE ──
-  function uncompleteItem(item: Item) {
+  async function handleUncomplete(item: Item) {
     if (busyIds.has(item.id)) return;
     markBusy(item.id);
     setDone((d) => d.filter((i) => i.id !== item.id));
     setPending((p) => [...p, { ...item, completed_at: null }]);
-    fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completed: false }) })
-      .then((res) => { clearBusy(item.id); if (!res.ok) console.error("[Checklist] uncomplete failed:", res.status); })
-      .catch((e) => { clearBusy(item.id); console.error("[Checklist] uncomplete error:", e); });
+    const result = await completeChecklist(item.id, false);
+    clearBusy(item.id);
+    if (result.error) toast.error("Erro ao desfazer");
   }
 
-  // ── DELETE (deferred for undo) ──
-  function deleteItem(item: Item, fromDone: boolean) {
+  async function handleDelete(item: Item, fromDone: boolean) {
     if (fromDone) setDone((d) => d.filter((i) => i.id !== item.id));
     else setPending((p) => p.filter((i) => i.id !== item.id));
 
-    const timer = setTimeout(() => {
-      pendingDeletes.current.delete(item.id);
-      fetch(`/api/checklists/${item.id}`, { method: "DELETE" }).catch((e) => console.error("[Checklist] delete error:", e));
-    }, UNDO_WINDOW_MS);
-    pendingDeletes.current.set(item.id, timer);
-
     toast("Tarefa excluída", {
-      duration: UNDO_WINDOW_MS,
       action: {
         label: "Desfazer",
         onClick: () => {
-          const t = pendingDeletes.current.get(item.id);
-          if (t) { clearTimeout(t); pendingDeletes.current.delete(item.id); }
           if (fromDone) setDone((d) => [...d, item]);
           else setPending((p) => [...p, item]);
         },
       },
     });
+
+    // Deferred delete — gives undo window
+    setTimeout(async () => {
+      await deleteChecklist(item.id);
+    }, 4000);
   }
 
-  // ── EDIT ──
-  function startEdit(item: Item) { setEditingId(item.id); setEditText(item.text); setTimeout(() => editRef.current?.focus(), 0); }
+  function startEdit(item: Item) {
+    setEditingId(item.id);
+    setEditText(item.text);
+    setTimeout(() => editRef.current?.focus(), 0);
+  }
+
   async function saveEdit(item: Item) {
     const text = editText.trim();
     if (!text || text === item.text) { setEditingId(null); return; }
     setPending((p) => p.map((i) => i.id === item.id ? { ...i, text } : i));
     setEditingId(null);
-    try {
-      const res = await fetch(`/api/checklists/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
-      if (!res.ok) throw new Error(`PATCH ${res.status}`);
-    } catch (err) {
-      console.error("[Checklist] edit failed:", err);
+    const result = await editChecklist(item.id, text);
+    if (result.error) {
       setPending((p) => p.map((i) => i.id === item.id ? { ...i, text: item.text } : i));
       toast.error("Erro ao editar");
     }
@@ -142,7 +130,6 @@ export function ChecklistPanel({
 
   return (
     <div>
-      {/* ── Pending items ── */}
       <ul className="flex flex-col" role="list">
         {pending.map((item) => (
           <li key={item.id} className="checklist-item flex items-start gap-2.5 border-b border-border/60 py-2 last:border-b-0">
@@ -152,8 +139,8 @@ export function ChecklistPanel({
               aria-checked="false"
               aria-label={`Concluir: ${item.text}`}
               disabled={busyIds.has(item.id)}
-              onClick={() => completeItem(item)}
-              className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border text-transparent transition-colors hover:border-accent hover:text-accent-2 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
+              onClick={() => handleComplete(item)}
+              className="press mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border text-transparent hover:border-accent hover:text-accent-2 focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50"
             >
               <Check className="h-3 w-3" />
             </button>
@@ -166,7 +153,6 @@ export function ChecklistPanel({
                   onKeyDown={(e) => { if (e.key === "Enter") saveEdit(item); if (e.key === "Escape") setEditingId(null); }}
                   onBlur={() => saveEdit(item)}
                   className="w-full bg-transparent text-sm text-foreground outline-none"
-                  aria-label="Editar tarefa"
                 />
               ) : (
                 <span className="text-sm text-foreground cursor-text" onDoubleClick={() => startEdit(item)}>
@@ -180,11 +166,10 @@ export function ChecklistPanel({
             </div>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); deleteItem(item, false); }}
+              onClick={(e) => { e.stopPropagation(); handleDelete(item, false); }}
               title="Excluir tarefa"
               aria-label={`Excluir: ${item.text}`}
-              tabIndex={0}
-              className="checklist-action mt-0.5 shrink-0 rounded p-0.5 text-muted hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="checklist-action mt-0.5 shrink-0 rounded p-0.5 text-muted hover:text-danger focus-visible:ring-2 focus-visible:ring-accent/40"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -192,7 +177,6 @@ export function ChecklistPanel({
         ))}
       </ul>
 
-      {/* ── Quick add ── */}
       <div className="mt-2 flex items-center gap-2">
         <Plus className="h-4 w-4 shrink-0 text-muted" />
         <input
@@ -200,12 +184,10 @@ export function ChecklistPanel({
           onChange={(e) => setNewText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addItem()}
           placeholder="Adicionar item..."
-          aria-label="Adicionar item ao checklist"
           className="h-8 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted"
         />
       </div>
 
-      {/* ── Completed (collapsed) ── */}
       {done.length > 0 && (
         <details className="mt-3 border-t border-border/60 pt-2">
           <summary className="cursor-pointer text-xs text-muted hover:text-foreground">
@@ -218,22 +200,19 @@ export function ChecklistPanel({
                   type="button"
                   role="checkbox"
                   aria-checked="true"
-                  aria-label={`Desfazer conclusão: ${item.text}`}
+                  aria-label={`Desfazer: ${item.text}`}
                   disabled={busyIds.has(item.id)}
-                  onClick={() => uncompleteItem(item)}
-                  title="Desfazer conclusão"
-                  className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border bg-accent-soft text-accent-2 disabled:opacity-50"
+                  onClick={() => handleUncomplete(item)}
+                  className="press flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border border-border bg-accent-soft text-accent-2 disabled:opacity-50"
                 >
                   <Check className="h-3 w-3" />
                 </button>
                 <span className="flex-1 truncate text-sm text-muted line-through">{item.text}</span>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); deleteItem(item, true); }}
-                  title="Excluir tarefa"
-                  aria-label={`Excluir: ${item.text}`}
-                  tabIndex={0}
-                  className="checklist-action rounded p-0.5 text-muted hover:text-danger focus-visible:ring-2 focus-visible:ring-accent/40"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(item, true); }}
+                  title="Excluir"
+                  className="checklist-action rounded p-0.5 text-muted hover:text-danger"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
