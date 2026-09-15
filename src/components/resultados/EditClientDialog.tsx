@@ -150,11 +150,65 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                 </div>
               </div>
 
-              {form.commission_type === "legacy_recurring" && (
-                <div className="rounded-md border border-border-subtle bg-surface-2 px-3 py-2 text-xs text-muted">
-                  Comissão calculada automaticamente: {form.commission_percent}% de R${form.initial_monthly_fee} × meses desde início.
-                </div>
-              )}
+              {form.commission_type === "legacy_recurring" && form.closed_at && (() => {
+                const monthlyComm = (form.commission_percent / 100) * form.initial_monthly_fee;
+                const start = new Date(form.closed_at + "T12:00:00Z");
+                const now = new Date();
+                const months: { key: string; label: string }[] = [];
+                const cursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+                const endMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+                while (cursor <= endMonth) {
+                  months.push({
+                    key: `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, "0")}`,
+                    label: cursor.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }),
+                  });
+                  cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+                }
+                months.reverse();
+                const paidCount = form.legacy_months_paid;
+                const totalMonths = months.length;
+                return (
+                  <div className="rounded-md border border-border bg-surface p-3">
+                    <div className="mb-2 flex items-center justify-between text-xs">
+                      <span className="text-muted">{form.commission_percent}% de R${form.initial_monthly_fee.toLocaleString("pt-BR")} = <strong className="text-foreground">R${monthlyComm.toLocaleString("pt-BR")}/mês</strong></span>
+                      <span className="tabular-nums text-muted">{paidCount}/{totalMonths} pagos</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+                      {months.map((m, i) => {
+                        const monthIndex = totalMonths - 1 - i;
+                        const isPaid = monthIndex < paidCount;
+                        return (
+                          <label key={m.key} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-surface-2 cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isPaid}
+                                onChange={() => {
+                                  if (isPaid) {
+                                    set("legacy_months_paid", monthIndex);
+                                  } else {
+                                    set("legacy_months_paid", monthIndex + 1);
+                                  }
+                                  set("commission_received", (isPaid ? monthIndex : monthIndex + 1) * monthlyComm);
+                                }}
+                                className="accent-accent h-4 w-4"
+                              />
+                              <span className={isPaid ? "text-foreground" : "text-muted"}>{m.label}</span>
+                            </div>
+                            <span className={`tabular-nums text-xs ${isPaid ? "text-success" : "text-muted"}`}>
+                              R${monthlyComm.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-xs">
+                      <span className="text-muted">Recebido</span>
+                      <span className="font-medium tabular-nums text-foreground">R${(paidCount * monthlyComm).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {form.commission_type === "one_time_percentage" && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
