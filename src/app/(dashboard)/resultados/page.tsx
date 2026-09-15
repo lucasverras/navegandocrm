@@ -4,6 +4,7 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import { Table, THead, TBody, Tr, Th } from "@/components/ui/Table";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { FechadoCard, FechadoRow, type Fechado } from "@/components/resultados/FechadoRow";
+import { ResultadosTable } from "@/components/resultados/ResultadosFilters";
 import { CommissionRow, type CommissionClient } from "@/components/resultados/CommissionRow";
 import { ReimbursementsPanel, type Reimb } from "@/components/resultados/ReimbursementsPanel";
 import { AddClientDialog } from "@/components/resultados/AddClientDialog";
@@ -139,33 +140,7 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
           {clients.length === 0 ? (
             <Empty />
           ) : (
-            <>
-            <div className="flex flex-col gap-3 md:hidden">
-              {clients.map((c) => <FechadoCard key={c.id} client={c as Fechado} />)}
-            </div>
-            <div className="hidden md:block"><Table>
-              <THead>
-                <Tr>
-                  <Th>Cliente</Th>
-                  <Th>Entrou</Th>
-                  <Th>Saiu</Th>
-                  <Th>Meses</Th>
-                  <Th>Mensalidade</Th>
-                  <Th>Receita Nav.</Th>
-                  <Th>Comissão</Th>
-                  <Th>Recebida</Th>
-                  <Th>Pendente</Th>
-                  <Th>Status</Th>
-                  <Th></Th>
-                </Tr>
-              </THead>
-              <TBody>
-                {clients.map((c) => (
-                  <FechadoRow key={c.id} client={c as Fechado} />
-                ))}
-              </TBody>
-            </Table></div>
-            </>
+            <ResultadosTable clients={clients as Fechado[]} />
           )}
         </div>
       )}
