@@ -10,12 +10,12 @@ const CRM_SELECT =
   "id, name, phone, instagram, instagram_handle, instagram_url, category, " +
   "region_id, pipeline_stage, contact_round, next_action_type, next_action_at, " +
   "proposal_value, proposal_sent_at, meeting_at, assigned_to, last_contacted_at, " +
-  "commercial_status, maps_url, website, notes, archived_at";
+  "commercial_status, maps_url, website, notes, archived_at, lead_origin";
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; region?: string; stage?: string; sort?: string; page?: string; q?: string }>;
+  searchParams: Promise<{ view?: string; region?: string; stage?: string; sort?: string; page?: string; q?: string; source?: string }>;
 }) {
   const params = await searchParams;
   const supabase = await createClient();
@@ -59,6 +59,8 @@ export default async function LeadsPage({
 
   if (params.region) query = query.eq("region_id", params.region);
   if (params.stage) query = query.filter("pipeline_stage", "eq", params.stage);
+  if (params.source === "manual") query = query.eq("lead_origin", "manual");
+  if (params.source === "radar") query = query.neq("lead_origin", "manual");
   if (params.q) {
     const q = params.q.trim();
     query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%,instagram_handle.ilike.%${q}%`);
@@ -102,7 +104,7 @@ export default async function LeadsPage({
     proposal_value: number | null; proposal_sent_at: string | null;
     meeting_at: string | null; assigned_to: string | null; last_contacted_at: string | null;
     commercial_status: string | null; maps_url: string | null; website: string | null;
-    notes: string | null; archived_at: string | null;
+    notes: string | null; archived_at: string | null; lead_origin: string;
   };
 
   const leads = (leadsRaw ?? []) as unknown as CRMLeadRow[];
