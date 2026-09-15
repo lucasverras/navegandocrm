@@ -353,13 +353,35 @@ export function LeadDrawer() {
               </Section>
             )}
 
-            <Link
-              href={`/leads/${lead.id}`}
-              onClick={close}
-              className="inline-flex w-fit items-center gap-1 text-sm text-accent-2 hover:underline"
-            >
-              Abrir página completa →
-            </Link>
+            <div className="flex items-center justify-between">
+              <Link
+                href={`/leads/${lead.id}`}
+                onClick={close}
+                className="inline-flex w-fit items-center gap-1 text-sm text-accent-2 hover:underline"
+              >
+                Abrir página completa →
+              </Link>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.confirm(`Excluir "${lead.name}"?`)) return;
+                  setBusy("delete");
+                  const res = await fetch(`/api/leads/${lead.id}/lose`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reason: "Excluído manualmente" }),
+                  }).catch(() => null);
+                  setBusy(null);
+                  if (!res?.ok) { toast.error("Erro ao excluir"); return; }
+                  toast.success("Lead excluído");
+                  close();
+                }}
+                disabled={busy === "delete"}
+                className="text-xs text-muted hover:text-danger disabled:opacity-50"
+              >
+                Excluir lead
+              </button>
+            </div>
           </div>
         )}
       </aside>
