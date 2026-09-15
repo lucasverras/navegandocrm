@@ -106,3 +106,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   return NextResponse.json({ ok: true, lead: data });
 }
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const { id } = await params;
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  const { error } = await admin
+    .from("leads")
+    .update({ pipeline_stage: null, closed_at: null, archived_at: now, last_activity_at: now })
+    .eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await admin.from("outreach_events").insert({
+    lead_id: id,
+    event_type: "archived",
+    channel: "system",
+    metadata: { reason: "removed_from_results", by: user.id },
+    performed_by: user.id,
+  });
+
+  return NextResponse.json({ ok: true });
+}

@@ -27,6 +27,8 @@ import type { LeadRow } from "@/types/database";
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
+const BOARD_STAGES = PIPELINE_STAGES.filter((s) => s !== "closed");
+
 function groupByStage(leads: LeadRow[]): Record<PipelineStage, LeadRow[]> {
   const groups = Object.fromEntries(PIPELINE_STAGES.map((s) => [s, [] as LeadRow[]])) as Record<PipelineStage, LeadRow[]>;
   for (const lead of leads) {
@@ -304,7 +306,7 @@ export function PipelineBoard({
     }
   }
 
-  const closedTotal = columns.closed.reduce((sum, l) => sum + (l.closed_value ?? 0), 0);
+  // Closed leads are shown only in Resultados, not on the Pipeline board.
 
   return (
     <div className="flex flex-col gap-4">
@@ -314,7 +316,7 @@ export function PipelineBoard({
           onChange={(e) => setMobileStage(e.target.value as PipelineStage)}
           className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-foreground md:hidden"
         >
-          {PIPELINE_STAGES.map((s) => (
+          {BOARD_STAGES.map((s) => (
             <option key={s} value={s}>
               {PIPELINE_STAGE_LABELS[s]} ({columns[s].length})
             </option>
@@ -341,14 +343,13 @@ export function PipelineBoard({
             ref={scrollRef}
             className="flex gap-3 overflow-x-auto scroll-smooth rounded-xl bg-surface-2 p-3 scrollbar-thin"
           >
-            {PIPELINE_STAGES.map((stage) => (
+            {BOARD_STAGES.map((stage) => (
               <div key={stage} className={stage === mobileStage ? "block w-full md:w-auto" : "hidden md:block"}>
                 <PipelineColumn
                   stage={stage}
                   leads={columns[stage]}
                   regionMap={regionMap}
-                  totalValue={stage === "closed" ? closedTotal : undefined}
-                  footer={stage !== "closed" ? <PipelineAddLead stage={stage} variant="footer" /> : undefined}
+                  footer={<PipelineAddLead stage={stage} variant="footer" />}
                 >
                   <SortableContext items={columns[stage].map((l) => l.id)} strategy={verticalListSortingStrategy}>
                     {columns[stage].map((lead) => (

@@ -29,7 +29,7 @@ export default async function LeadsPage({
   if (view === "lost") {
     query = query.not("archived_at", "is", null);
   } else {
-    query = query.is("archived_at", null);
+    query = query.is("archived_at", null).or("pipeline_stage.is.null,pipeline_stage.neq.closed");
   }
 
   switch (view) {
@@ -90,6 +90,7 @@ export default async function LeadsPage({
       .from("leads")
       .select("pipeline_stage, next_action_type, contact_round, proposal_sent_at, archived_at")
       .is("archived_at", null)
+      .or("pipeline_stage.is.null,pipeline_stage.neq.closed")
       .limit(5000),
   ]);
 

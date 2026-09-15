@@ -110,6 +110,7 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
           <input
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addReimb()}
             placeholder="Descrição (ex: Drone, Uber)"
             autoFocus
             className="h-8 rounded border border-border bg-surface px-2 text-sm text-foreground outline-none focus:border-accent"

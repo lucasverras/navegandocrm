@@ -16,6 +16,7 @@ export default async function PipelinePage() {
       )
       .is("archived_at", null)
       .not("pipeline_stage", "is", null)
+      .neq("pipeline_stage", "closed")
       .order("pipeline_stage", { ascending: true })
       .order("pipeline_position", { ascending: true })
       .limit(200),
