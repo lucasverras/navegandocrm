@@ -116,6 +116,22 @@ body {
   animation: scale-in 0.15s ease-out;
 }
 
+/* Tactile feedback — Philox-inspired interaction utilities. */
+.lift { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.lift:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.lift:active, .press:active { transform: scale(0.97); }
+.press { transition: transform 0.1s ease; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-rise { animation: rise 0.3s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lift, .press { transition: none; }
+  .lift:hover { transform: none; }
+  .lift:active, .press:active { transform: none; }
+  .animate-rise, .animate-fade-in, .animate-slide-in-right, .animate-scale-in { animation: none; }
+}
+
 /* Checklist hover-delete: bulletproof CSS, no Tailwind variant stacking. */
 .checklist-item .checklist-action { opacity: 0; transition: opacity 0.15s; }
 .checklist-item:hover .checklist-action,

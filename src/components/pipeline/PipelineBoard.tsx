@@ -27,7 +27,7 @@ import type { LeadRow } from "@/types/database";
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
 
-const BOARD_STAGES = PIPELINE_STAGES.filter((s) => s !== "closed");
+const BOARD_STAGES: PipelineStage[] = ["ready_to_approach", "first_contact", "meeting", "proposal", "negotiation"];
 
 function groupByStage(leads: LeadRow[]): Record<PipelineStage, LeadRow[]> {
   const groups = Object.fromEntries(PIPELINE_STAGES.map((s) => [s, [] as LeadRow[]])) as Record<PipelineStage, LeadRow[]>;
