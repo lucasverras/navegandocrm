@@ -12,6 +12,7 @@ import { formatDate, formatHumanDate, daysFromNow } from "@/lib/utils";
 import { BRL } from "@/lib/finance";
 import { categoryLabel, nextActionLabel, PIPELINE_STAGE_LABELS, PIPELINE_STAGES, CONTACT_ROUND_LABELS } from "@/types/domain";
 import type { PipelineStage } from "@/types/domain";
+import { saveLeadNote, setFollowUp as setFollowUpAction, movePipelineLead } from "@/app/(dashboard)/hoje/actions";
 
 type Summary = {
   lead: {
@@ -129,13 +130,9 @@ export function LeadDrawer() {
     const d = new Date();
     d.setDate(d.getDate() + days);
     d.setHours(9, 0, 0, 0);
-    const res = await fetch(`/api/leads/${lead.id}/follow-up`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ next_follow_up_at: d.toISOString() }),
-    }).catch(() => null);
+    const result = await setFollowUpAction(lead.id, d.toISOString());
     setBusy(null);
-    if (!res?.ok) return void toast.error("Erro ao agendar follow-up");
+    if (result.error) return void toast.error("Erro ao agendar follow-up");
     toast.success(days === 1 ? "Follow-up amanhã" : `Follow-up em ${days} dias`);
     reload();
   }
@@ -143,13 +140,9 @@ export function LeadDrawer() {
   async function saveNotes() {
     if (!lead || notesDraft == null) return;
     setBusy("notes");
-    const res = await fetch(`/api/leads/${lead.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes: notesDraft }),
-    }).catch(() => null);
+    const result = await saveLeadNote(lead.id, notesDraft);
     setBusy(null);
-    if (!res?.ok) return void toast.error("Erro ao salvar nota");
+    if (result.error) return void toast.error("Erro ao salvar nota");
     toast.success("Nota salva");
     reload();
   }
@@ -292,15 +285,12 @@ export function LeadDrawer() {
                     value={lead.pipeline_stage ?? ""}
                     onChange={async (e) => {
                       const stage = e.target.value || null;
+                      if (!stage) return;
                       setBusy("stage");
-                      const res = await fetch(`/api/leads/${lead.id}/pipeline`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ stage, position: 0 }),
-                      }).catch(() => null);
+                      const result = await movePipelineLead(lead.id, stage, 0);
                       setBusy(null);
-                      if (!res?.ok) return void toast.error("Erro ao mover");
-                      toast.success(`Movido para ${PIPELINE_STAGE_LABELS[stage as PipelineStage] ?? "Sem etapa"}`);
+                      if (result.error) return void toast.error("Erro ao mover");
+                      toast.success(`Movido para ${PIPELINE_STAGE_LABELS[stage as PipelineStage] ?? stage}`);
                       reload();
                     }}
                     disabled={busy === "stage"}

@@ -26,6 +26,7 @@ import { ArchivedLeads } from "@/components/pipeline/ArchivedLeads";
 import type { LeadRow } from "@/types/database";
 import { PIPELINE_STAGES, PIPELINE_STAGE_LABELS } from "@/types/domain";
 import type { PipelineStage, MeetingStatus } from "@/types/domain";
+import { movePipelineLead } from "@/app/(dashboard)/hoje/actions";
 
 const BOARD_STAGES: PipelineStage[] = ["ready_to_approach", "first_contact", "meeting", "proposal", "negotiation"];
 
@@ -148,19 +149,10 @@ export function PipelineBoard({
 
     setLeads(next);
 
-    try {
-      const res = await fetch(`/api/leads/${leadId}/pipeline`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stage: destStage, position: clampedIndex }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error ?? "Erro ao mover lead");
-      }
-    } catch (err) {
+    const result = await movePipelineLead(leadId, destStage, clampedIndex);
+    if (result.error) {
       setLeads(snapshot);
-      toast.error(err instanceof Error ? err.message : "Erro ao mover lead");
+      toast.error(result.error);
     }
   }
 

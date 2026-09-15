@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Plus, Check } from "lucide-react";
 import { BRL } from "@/lib/finance";
+import { createReimbursement, markReimbursementReceived } from "@/app/(dashboard)/hoje/actions";
 
 type Reimb = { id: string; description: string; amount: number; amount_received: number; status: string };
 
@@ -13,7 +14,6 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
   const [adding, setAdding] = useState(false);
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const total = reimbs.reduce((s, r) => s + (r.amount - (r.amount_received ?? 0)), 0);
 
@@ -23,50 +23,29 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
     if (!d || !v || isNaN(v)) { toast.error("Descrição e valor são obrigatórios"); return; }
 
     const tempId = `temp-${Date.now()}`;
-    const item: Reimb = { id: tempId, description: d, amount: v, amount_received: 0, status: "pendente" };
-    setReimbs((r) => [...r, item]);
-    setDesc("");
-    setAmount("");
-    setAdding(false);
+    setReimbs((r) => [...r, { id: tempId, description: d, amount: v, amount_received: 0, status: "pendente" }]);
+    setDesc(""); setAmount(""); setAdding(false);
 
-    try {
-      const res = await fetch("/api/reimbursements", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: d, amount: v }),
-      });
-      if (!res.ok) throw new Error(`POST ${res.status}`);
-      const data = await res.json();
-      if (data?.reimbursement?.id) {
-        setReimbs((r) => r.map((i) => i.id === tempId ? { ...i, id: data.reimbursement.id } : i));
+    const result = await createReimbursement(d, v);
+    if (result.error) {
+      setReimbs((r) => r.filter((i) => i.id !== tempId));
+      toast.error(result.error);
+    } else {
+      if (result.reimbursement?.id) {
+        setReimbs((r) => r.map((i) => i.id === tempId ? { ...i, id: result.reimbursement.id } : i));
       }
       toast.success("Reembolso adicionado");
-    } catch (err) {
-      console.error("[Reimb] create failed:", err);
-      setReimbs((r) => r.filter((i) => i.id !== tempId));
-      toast.error("Erro ao adicionar reembolso");
     }
   }
 
   async function markReceived(item: Reimb) {
-    if (busy) return;
-    setBusy(true);
     setReimbs((r) => r.filter((i) => i.id !== item.id));
-
-    try {
-      const res = await fetch(`/api/reimbursements/${item.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "recebido" }),
-      });
-      if (!res.ok) throw new Error(`PATCH ${res.status}`);
-      toast.success("Reembolso recebido");
-    } catch (err) {
-      console.error("[Reimb] mark received failed:", err);
+    const result = await markReimbursementReceived(item.id);
+    if (result.error) {
       setReimbs((r) => [...r, item]);
       toast.error("Erro ao marcar recebido");
-    } finally {
-      setBusy(false);
+    } else {
+      toast.success("Reembolso recebido");
     }
   }
 
@@ -86,7 +65,7 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
                       type="button"
                       onClick={() => markReceived(r)}
                       title="Marcar recebido"
-                      className="checklist-action flex h-6 w-6 items-center justify-center rounded text-muted hover:text-success"
+                      className="checklist-action press flex h-6 w-6 items-center justify-center rounded text-muted hover:text-success"
                     >
                       <Check className="h-3.5 w-3.5" />
                     </button>
@@ -104,7 +83,6 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
         </>
       )}
 
-      {/* Quick add */}
       {adding ? (
         <div className="mt-3 flex flex-col gap-2 rounded-md border border-border bg-surface-2 p-3">
           <input
@@ -124,7 +102,7 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
             className="h-8 rounded border border-border bg-surface px-2 text-sm tabular-nums text-foreground outline-none focus:border-accent"
           />
           <div className="flex gap-2">
-            <button type="button" onClick={addReimb} className="rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-2">
+            <button type="button" onClick={addReimb} className="press rounded bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-2">
               Salvar
             </button>
             <button type="button" onClick={() => setAdding(false)} className="text-xs text-muted hover:text-foreground">
@@ -133,11 +111,7 @@ export function HomeReimbs({ initialReimbs }: { initialReimbs: Reimb[] }) {
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="mt-2 flex items-center gap-1 text-xs text-accent-2 hover:text-accent"
-        >
+        <button type="button" onClick={() => setAdding(true)} className="mt-2 flex items-center gap-1 text-xs text-accent-2 hover:text-accent">
           <Plus className="h-3.5 w-3.5" /> Reembolso
         </button>
       )}
