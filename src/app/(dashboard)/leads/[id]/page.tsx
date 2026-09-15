@@ -17,6 +17,7 @@ import { RegisterContactButton } from "@/components/leads/RegisterContactButton"
 import { Timeline } from "@/components/leads/Timeline";
 import { instagramUrl } from "@/components/leads/LeadQuickActions";
 import { FindInstagramButton } from "@/components/leads/FindInstagramButton";
+import { DeleteLeadButton } from "@/components/leads/DeleteLeadButton";
 import { formatDate, formatHumanDate, daysFromNow } from "@/lib/utils";
 import { PIPELINE_STAGE_LABELS, categoryLabel } from "@/types/domain";
 import type {
@@ -220,7 +221,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       {/* Contato e decisor */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <DecisionMakerPanel leadId={lead.id} decisionMaker={decisionMaker ?? null} />
-        <StatusPanel leadId={lead.id} currentStatus={lead.commercial_status} />
+        <StatusPanel leadId={lead.id} currentStatus={lead.commercial_status ?? "not_contacted"} />
       </div>
 
       <ResponseActions leadId={lead.id} />
@@ -238,10 +239,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </CardContent>
       </Card>
 
-      <div className="text-right">
+      {/* Ações */}
+      <div className="flex items-center justify-between">
         <Link href="/leads" className="text-xs text-muted hover:text-foreground">
           ← Voltar para Leads
         </Link>
+        <DeleteLeadButton leadId={lead.id} leadName={lead.name} />
       </div>
     </div>
   );
