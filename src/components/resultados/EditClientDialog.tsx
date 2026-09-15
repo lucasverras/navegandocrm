@@ -135,7 +135,7 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>Regra comissão</label>
                   <select className={inputClass} value={form.commission_type} onChange={(e) => set("commission_type", e.target.value)}>
@@ -148,17 +148,19 @@ export function EditClientDialog({ client }: { client: ClientData }) {
                   <label className={labelClass}>% comissão</label>
                   <input type="number" className={inputClass} value={form.commission_percent} onChange={(e) => set("commission_percent", Number(e.target.value))} />
                 </div>
-                <div>
-                  <label className={labelClass}>Comissão recebida</label>
-                  <input type="number" className={inputClass} value={form.commission_received} onChange={(e) => set("commission_received", Number(e.target.value))} />
-                </div>
               </div>
 
               {form.commission_type === "legacy_recurring" && (
+                <div className="rounded-md border border-border-subtle bg-surface-2 px-3 py-2 text-xs text-muted">
+                  Comissão calculada automaticamente: {form.commission_percent}% de R${form.initial_monthly_fee} × meses desde início.
+                </div>
+              )}
+
+              {form.commission_type === "one_time_percentage" && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className={labelClass}>Meses pagos (legado)</label>
-                    <input type="number" className={inputClass} value={form.legacy_months_paid} onChange={(e) => set("legacy_months_paid", Number(e.target.value))} />
+                    <label className={labelClass}>Comissão recebida</label>
+                    <input type="number" className={inputClass} value={form.commission_received} onChange={(e) => set("commission_received", Number(e.target.value))} />
                   </div>
                   <div className="flex items-end gap-2 pb-1">
                     <label className="flex items-center gap-2 text-sm text-foreground">
