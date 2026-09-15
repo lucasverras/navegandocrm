@@ -80,7 +80,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
 
       <main className="min-h-screen flex-1 overflow-x-hidden pb-16 md:pb-0">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
       </main>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <NavLinks items={navItems.slice(0, 5)} orientation="bottom" />
